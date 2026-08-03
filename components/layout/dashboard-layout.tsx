@@ -1,0 +1,24 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+import { Sidebar } from "@/components/layout/sidebar";
+
+export function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+
+  // চেক করা হচ্ছে ইউজার Auth Page-এ আছে কি না
+  const isAuthPage = pathname.startsWith("/login") || pathname.startsWith("/register");
+
+  if (isAuthPage) {
+    // লগইন বা রেজিস্টার পেজে থাকলে শুধুই ফুল স্ক্রিন ফর্ম দেখাবে (No Sidebar)
+    return <main className="min-h-screen w-full">{children}</main>;
+  }
+
+  // লগইন পরবর্তী সুরক্ষিত পেজগুলোতে সাইডবারসহ ড্যাশবোর্ড লেআউট দেখাবে
+  return (
+    <div className="flex min-h-screen">
+      <Sidebar />
+      <main className="flex-1 overflow-y-auto p-6">{children}</main>
+    </div>
+  );
+}
