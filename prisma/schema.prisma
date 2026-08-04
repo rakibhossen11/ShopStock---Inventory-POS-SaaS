@@ -12,26 +12,335 @@ enum Role {
   CASHIER
 }
 
-model Store {
-  id        String   @id @default(cuid())
-  name      String
-  address   String?
-  phone     String?
-  currency  String   @default("BDT")
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+enum ShiftStatus {
+  OPEN
+  CLOSED
+}
 
-  users     User[]
+enum TransactionType {
+  CASH_IN
+  CASH_OUT
+  PAYMENT
+  REFUND
+}
+
+enum AdjustmentType {
+  ADD
+  SUBTRACT
+}
+
+model Store {
+  id                String            @id
+  name              String
+  address           String?
+  phone             String?
+  currency          String            @default("BDT")
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  users             User[]
+  cashRegisters     CashRegister[]
+  suppliers         Supplier[]
+  purchaseOrders    PurchaseOrder[]
+  supplierPayments  SupplierPayment[]
+  categories        Category[]
+  products          Product[]
+  stockAdjustments  StockAdjustment[]
+  customers         Customer[]
+  customerPayments  CustomerPayment[]
+  saleOrders        SaleOrder[]
+  expenses          Expense[]         // 👈 যুক্ত করা হয়েছে
+  expenseCategories ExpenseCategory[] // 👈 যুক্ত করা হয়েছে
 }
 
 model User {
-  id        String   @id @default(cuid())
+  id            String         @id @default(uuid())
+  staffCode     String?
+  storeId       String
+  store         Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  name          String
+  email         String         @unique
+  password      String
+  role          Role           @default(CASHIER)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  cashRegisters CashRegister[]
+}
+
+model CashRegister {
+  id              String            @id @default(uuid())
+  storeId         String
+  store           Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  userId          String
+  user            User              @relation(fields: [userId], references: [id])
+
+  openingBalance  Float
+  closingBalance  Float?
+  expectedBalance Float?
+  difference      Float?
+
+  status          ShiftStatus       @default(OPEN)
+  openedAt        DateTime          @default(now())
+  closedAt        DateTime?
+  note            String?
+
+  transactions    CashTransaction[]
+}
+
+model CashTransaction {
+  id         String          @id @default(uuid())
+  registerId String
+  register   CashRegister    @relation(fields: [registerId], references: [id], onDelete: Cascade)
+
+  type       TransactionType
+  amount     Float
+  reason     String?
+  createdAt  DateTime        @default(now())
+}
+
+model Supplier {
+  id             String            @id @default(uuid())
+  storeId        String
+  store          Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  name           String
+  contactPerson  String?
+  email          String?
+  phone          String
+  address        String?
+
+  openingBalance Float             @default(0)
+  currentBalance Float             @default(0)
+
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+
+  purchaseOrders PurchaseOrder[]
+  payments       SupplierPayment[]
+}
+
+model Category {
+  id        String    @id @default(uuid())
   storeId   String
-  store     Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
   name      String
-  email     String   @unique
-  password  String
-  role      Role     @default(CASHIER)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  slug      String?
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  products  Product[]
+}
+
+model Product {
+  id                   String                @id @default(uuid())
+  storeId              String
+  store                Store                 @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  categoryId           String?
+  category             Category?             @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  name                 String
+  sku                  String?
+  barcode              String?
+
+  costPrice            Float                 @default(0)
+  sellingPrice         Float                 @default(0)
+
+  stock                Int                   @default(0)
+  minStockAlert        Int                   @default(5)
+
+  unit                 String                @default("PCS")
+  description          String?
+
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+
+  purchaseItems        PurchaseItem[]
+  stockAdjustmentItems StockAdjustmentItem[]
+  saleItems            SaleItem[]
+}
+
+model PurchaseOrder {
+  id          String         @id @default(uuid())
+  storeId     String
+  store       Store          @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  supplierId  String
+  supplier    Supplier       @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  invoiceNo   String
+  totalAmount Float
+  paidAmount  Float          @default(0)
+  dueAmount   Float          @default(0)
+
+  status      String         @default("RECEIVED")
+  note        String?
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  items       PurchaseItem[]
+}
+
+model PurchaseItem {
+  id              String        @id @default(uuid())
+  purchaseOrderId String
+  purchaseOrder   PurchaseOrder @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  productId       String
+  product         Product       @relation(fields: [productId], references: [id])
+
+  quantity        Int
+  unitPrice       Float
+  totalPrice      Float
+
+  createdAt       DateTime      @default(now())
+}
+
+model SupplierPayment {
+  id            String   @id @default(uuid())
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  supplierId    String
+  supplier      Supplier @relation(fields: [supplierId], references: [id], onDelete: Cascade)
+
+  amount        Float
+  paymentMethod String   @default("CASH")
+  referenceNo   String?
+  note          String?
+
+  createdAt     DateTime @default(now())
+}
+
+model StockAdjustment {
+  id        String                @id @default(uuid())
+  storeId   String
+  store     Store                 @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  reason    String
+  createdAt DateTime              @default(now())
+
+  items     StockAdjustmentItem[]
+}
+
+model StockAdjustmentItem {
+  id           String          @id @default(uuid())
+  adjustmentId String
+  adjustment   StockAdjustment @relation(fields: [adjustmentId], references: [id], onDelete: Cascade)
+
+  productId    String
+  product      Product         @relation(fields: [productId], references: [id])
+
+  type         AdjustmentType
+  quantity     Int
+
+  createdAt    DateTime        @default(now())
+}
+
+model Customer {
+  id         String            @id @default(uuid())
+  storeId    String
+  store      Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  name       String
+  phone      String
+  email      String?
+  address    String?
+
+  dueBalance Float             @default(0)
+
+  createdAt  DateTime          @default(now())
+  updatedAt  DateTime          @updatedAt
+
+  payments   CustomerPayment[]
+  saleOrders SaleOrder[]
+}
+
+model CustomerPayment {
+  id            String   @id @default(uuid())
+  storeId       String
+  store         Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  customerId    String
+  customer      Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  amount        Float
+  paymentMethod String   @default("CASH")
+  referenceNo   String?
+  note          String?
+
+  createdAt     DateTime @default(now())
+}
+
+model SaleOrder {
+  id            String     @id @default(uuid())
+  storeId       String
+  store         Store      @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  customerId    String?
+  customer      Customer?  @relation(fields: [customerId], references: [id], onDelete: SetNull)
+
+  invoiceNo     String     @unique
+  subTotal      Float
+  discount      Float      @default(0)
+  grandTotal    Float
+
+  paidAmount    Float      @default(0)
+  dueAmount     Float      @default(0)
+  changeAmount  Float      @default(0)
+
+  paymentMethod String     @default("CASH")
+  status        String     @default("COMPLETED")
+
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+
+  items         SaleItem[]
+}
+
+model SaleItem {
+  id          String    @id @default(uuid())
+  saleOrderId String
+  saleOrder   SaleOrder @relation(fields: [saleOrderId], references: [id], onDelete: Cascade)
+
+  productId   String
+  product     Product   @relation(fields: [productId], references: [id])
+
+  quantity    Int
+  unitPrice   Float
+  totalPrice  Float
+
+  createdAt   DateTime  @default(now())
+}
+
+model ExpenseCategory {
+  id        String    @id @default(uuid())
+  storeId   String
+  store     Store     @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  name      String
+  expenses  Expense[]
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+}
+
+model Expense {
+  id            String           @id @default(uuid())
+  storeId       String
+  store         Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  categoryId    String?
+  category      ExpenseCategory? @relation(fields: [categoryId], references: [id], onDelete: SetNull)
+
+  amount        Float
+  paymentMethod String           @default("CASH")
+  title         String
+  referenceNo   String?
+  note          String?
+
+  createdAt     DateTime         @default(now())
 }

@@ -1,18 +1,22 @@
 import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
+import { getCurrentUser } from "@/lib/auth";
 
-const DEFAULT_STORE_ID = "store-id01966366745";
-
-// ১. সার্ভার থেকে স্টোরের তথ্য নিয়ে আসা (GET)
+// ১. কারেন্ট ইউজারের স্টোরের তথ্য নিয়ে আসা (GET)
 export async function GET() {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
+    }
+
     const store = await prisma.store.findUnique({
-      where: { id: DEFAULT_STORE_ID },
+      where: { id: currentUser.storeId },
     });
 
     if (!store) {
       return NextResponse.json(
-        { success: false, message: "No store configuration found" },
+        { success: false, error: "Store not found" },
         { status: 404 }
       );
     }
@@ -27,22 +31,23 @@ export async function GET() {
   }
 }
 
-// ২. স্টোরের তথ্য আপডেট/সেভ করা (POST)
+// ২. স্টোরের তথ্য আপডেট করা (POST)
 export async function POST(request: Request) {
   try {
+    const currentUser = await getCurrentUser();
+    if (!currentUser || currentUser.role !== "STORE_OWNER") {
+      return NextResponse.json(
+        { success: false, error: "Only Store Owner can update store details" },
+        { status: 403 }
+      );
+    }
+
     const body = await request.json();
     const { name, address, phone, currency } = body;
 
-    const store = await prisma.store.upsert({
-      where: { id: DEFAULT_STORE_ID },
-      update: {
-        name,
-        address,
-        phone,
-        currency,
-      },
-      create: {
-        id: DEFAULT_STORE_ID,
+    const store = await prisma.store.update({
+      where: { id: currentUser.storeId },
+      data: {
         name,
         address,
         phone,
@@ -52,9 +57,9 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ success: true, data: store });
   } catch (error) {
-    console.error("Store Setup Error:", error);
+    console.error("Store Update Error:", error);
     return NextResponse.json(
-      { success: false, error: "Failed to setup/update store" },
+      { success: false, error: "Failed to update store" },
       { status: 500 }
     );
   }

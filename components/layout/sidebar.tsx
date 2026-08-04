@@ -19,6 +19,7 @@ import {
   Settings,
   ChevronDown,
   Smartphone,
+  Wallet,
   LogOut
 } from "lucide-react";
 import { useState, useEffect } from "react";
@@ -57,6 +58,12 @@ const navItems: NavItem[] = [
   { title: "Payments", href: "/payments", icon: CreditCard },
   { title: "Warranty", href: "/warranty", icon: ShieldCheck },
   { title: "Staff", href: "/staff", icon: UserCheck },
+  {
+      title: "Cash Drawer", // 👈 ক্যাশ ড্রয়ার মেনু যোগ করা হলো
+      href: "/cash-register",
+      icon: Wallet,
+      // roles: ["STORE_OWNER", "MANAGER", "CASHIER"],
+    },
   { title: "Reports", href: "/reports", icon: BarChart3 },
   { title: "Support", href: "/support", icon: Headphones },
   { 
