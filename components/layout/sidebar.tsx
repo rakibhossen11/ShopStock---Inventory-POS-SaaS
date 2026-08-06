@@ -2,20 +2,20 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { 
-  Home, 
-  ShoppingCart, 
-  Package, 
-  Layers, 
-  DollarSign, 
-  Users, 
-  ShoppingBag, 
-  Truck, 
-  CreditCard, 
-  ShieldCheck, 
-  UserCheck, 
-  BarChart3, 
-  Headphones, 
+import {
+  Home,
+  ShoppingCart,
+  Package,
+  Layers,
+  DollarSign,
+  Users,
+  ShoppingBag,
+  Truck,
+  CreditCard,
+  ShieldCheck,
+  UserCheck,
+  BarChart3,
+  Headphones,
   Settings,
   ChevronDown,
   Smartphone,
@@ -28,34 +28,42 @@ import { useAuthStore } from "@/app/stores/useAuthStore";
 
 const navItems: NavItem[] = [
   { title: "Home", href: "/", icon: Home },
-  { 
-    title: "Sell", 
-    href: "/sell", 
+  {
+    title: "Sell",
+    href: "/sell",
     icon: ShoppingCart,
     subItems: [
       { title: "Quick sale", href: "/sell/quick" },
       { title: "Invoice sale", href: "/sell/invoice" }
     ]
   },
-  { 
-    title: "MFS & Recharge", 
-    href: "/mfs", 
+  {
+    title: "MFS & Recharge",
+    href: "/mfs",
     icon: Smartphone,
     subItems: [
-      { title: "Dashboard & Wallets", href: "/mfs" },
-      { title: "MFS Sell", href: "/mfs/sell" },
+      // { title: "Dashboard & Wallets", href: "/mfs" },
+      // { title: "MFS Sell", href: "/mfs/sell" },
       { title: "MFS Stock", href: "/mfs/stock" },
-      { title: "Agent Wallets", href: "/mfs/agentwallet" },
-      { title: "Personal Wallets", href: "/mfs/personal" },
-      { title: "New Transaction", href: "/mfs/transaction" },
-      { title: "Mobile Recharge", href: "/mfs/recharge" },
-      { title: "History & Profit", href: "/mfs/history" },
-      { title: "MFS Settings", href: "/mfs/settings" }
+      { title: "Wallets", href: "/mfs/wallets" },
+      { title: "Recharge", href: "/mfs/recharge" },
+      // { title: "Agent Wallets", href: "/mfs/agentwallet" },
+      // { title: "Personal Wallets", href: "/mfs/personal" },
+      // { title: "New Transaction", href: "/mfs/transaction" },
+      // { title: "Mobile Recharge", href: "/mfs/recharge" },
+      { title: "History & Profit", href: "/mfs/commission-history" },
+      // { title: "MFS Settings", href: "/mfs/settings" }
     ]
   },
   { title: "Products", href: "/products", icon: Package },
   { title: "Stock", href: "/stock", icon: Layers },
-  { title: "Sales", href: "/sales", icon: DollarSign },
+  {
+    title: "Sales", href: "/sales", icon: DollarSign, 
+    subItems: [
+      { title: "Sales", href: "/sales" },
+      { title: "Profits History", href: "/sales/profit" },
+    ]
+  },
   { title: "Customers", href: "/customers", icon: Users },
   { title: "Purchases", href: "/purchases", icon: ShoppingBag },
   { title: "Suppliers", href: "/suppliers", icon: Truck },
@@ -63,21 +71,21 @@ const navItems: NavItem[] = [
   { title: "Warranty", href: "/warranty", icon: ShieldCheck },
   { title: "Staff", href: "/staff", icon: UserCheck },
   {
-      title: "Cash Drawer", // 👈 ক্যাশ ড্রয়ার মেনু যোগ করা হলো
-      href: "/cash-register",
-      icon: Wallet,
-      // roles: ["STORE_OWNER", "MANAGER", "CASHIER"],
-    },
+    title: "Cash Drawer", // 👈 ক্যাশ ড্রয়ার মেনু যোগ করা হলো
+    href: "/cash-register",
+    icon: Wallet,
+    // roles: ["STORE_OWNER", "MANAGER", "CASHIER"],
+  },
   { title: "Reports", href: "/reports", icon: BarChart3 },
   { title: "Support", href: "/support", icon: Headphones },
-  { 
-    title: "Settings", 
-    href: "/settings", 
+  {
+    title: "Settings",
+    href: "/settings",
     icon: Settings,
     subItems: [
       { title: "Store Setup", href: "/settings/store-setup" },
       { title: "Invoice sale", href: "/settings/invoice" }
-    ] 
+    ]
   },
 ];
 
@@ -129,20 +137,18 @@ export function Sidebar() {
                 <div key={item.title} className="space-y-1">
                   <button
                     onClick={() => toggleMenu(item.title)}
-                    className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                      isSubActive 
-                        ? "text-emerald-700 bg-emerald-50 font-semibold" 
+                    className={`w-full flex items-center justify-between px-3 py-2 text-sm font-medium rounded-md transition-colors ${isSubActive
+                        ? "text-emerald-700 bg-emerald-50 font-semibold"
                         : "text-slate-600 hover:bg-slate-200/60 hover:text-slate-900"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center gap-3">
                       <Icon className={`w-4 h-4 ${isSubActive ? "text-emerald-600" : "text-slate-500"}`} />
                       <span>{item.title}</span>
                     </div>
                     <ChevronDown
-                      className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${
-                        isOpen ? "rotate-180" : ""
-                      }`}
+                      className={`w-4 h-4 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180" : ""
+                        }`}
                     />
                   </button>
 
@@ -155,11 +161,10 @@ export function Sidebar() {
                           <Link
                             key={sub.title}
                             href={sub.href}
-                            className={`block px-3 py-1.5 text-xs rounded-md transition-colors ${
-                              isChildActive
+                            className={`block px-3 py-1.5 text-xs rounded-md transition-colors ${isChildActive
                                 ? "text-emerald-700 bg-emerald-100/60 font-semibold"
                                 : "text-slate-500 hover:text-slate-900 hover:bg-slate-200/40"
-                            }`}
+                              }`}
                           >
                             {sub.title}
                           </Link>
@@ -175,11 +180,10 @@ export function Sidebar() {
               <Link
                 key={item.title}
                 href={item.href}
-                className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${
-                  isActive
+                className={`flex items-center gap-3 px-3 py-2 text-sm font-medium rounded-md transition-colors ${isActive
                     ? "bg-emerald-50 text-emerald-700 font-semibold"
                     : "text-slate-600 hover:bg-slate-200/60 hover:text-slate-900"
-                }`}
+                  }`}
               >
                 <Icon className={`w-4 h-4 ${isActive ? "text-emerald-600" : "text-slate-500"}`} />
                 <span>{item.title}</span>

@@ -63,34 +63,39 @@ enum MfsTxType {
 // ------------------------------------------------------
 
 model Store {
-  id                  String               @id
-  name                String
-  address             String?
-  phone               String?
-  currency            String               @default("BDT")
-  createdAt           DateTime             @default(now())
-  updatedAt           DateTime             @updatedAt
+  id                    String                 @id
+  name                  String
+  address               String?
+  phone                 String?
+  currency              String                 @default("BDT")
+  createdAt             DateTime               @default(now())
+  updatedAt             DateTime               @updatedAt
 
-  users               User[]
-  cashRegisters       CashRegister[]
-  suppliers           Supplier[]
-  purchaseOrders      PurchaseOrder[]
-  supplierPayments    SupplierPayment[]
-  categories          Category[]
-  products            Product[]
-  stockAdjustments    StockAdjustment[]
-  customers           Customer[]
-  customerPayments    CustomerPayment[]
-  saleOrders          SaleOrder[]
-  expenses            Expense[]
-  expenseCategories   ExpenseCategory[]
-  mfsAgentWallets     MFSAgentWallet[]
-  mfsPersonalWallets  MFSPersonalWallet[]
-  mfsCategories       MfsCategory[]
-  mfsTransactions     MfsTransaction[]
-  mfsOrders           MfsOrder[]
-  dailyClosings       DailyClosing[]
-  mfsDailyStocks      MfsDailyStock[]
+  users                 User[]
+  cashRegisters         CashRegister[]
+  suppliers             Supplier[]
+  purchaseOrders        PurchaseOrder[]
+  supplierPayments      SupplierPayment[]
+  categories            Category[]
+  products              Product[]
+  stockAdjustments      StockAdjustment[]
+  customers             Customer[]
+  customerPayments      CustomerPayment[]
+  saleOrders            SaleOrder[]
+  expenses              Expense[]
+  expenseCategories     ExpenseCategory[]
+  mfsAgentWallets       MFSAgentWallet[]
+  mfsPersonalWallets    MFSPersonalWallet[]
+  mfsCategories         MfsCategory[]
+  mfsTransactions       MfsTransaction[]
+  mfsOrders             MfsOrder[]
+  dailyClosings         DailyClosing[]
+  mfsDailyStocks        MfsDailyStock[]
+  
+  // 👈 Recharge Module Relations
+  rechargeSims          RechargeSim[]
+  rechargePurchases     RechargePurchase[]
+  rechargeDailyBalances RechargeDailyBalance[]
 }
 
 model User {
@@ -566,4 +571,56 @@ model MfsDailyStock {
   note              String?
   createdAt         DateTime           @default(now())
   updatedAt         DateTime           @updatedAt
+}
+
+// ------------------------------------------------------
+// FLEXILOAD & RECHARGE MODULE MODELS
+// ------------------------------------------------------
+
+model RechargeSim {
+  id             String                 @id @default(uuid())
+  storeId        String
+  store          Store                  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  operatorName   String                 // Grameenphone, Robi, Banglalink, Airtel, Teletalk
+  simNumber      String                 // 017XXXXXXXX
+  currentBalance Float                  @default(0) // বর্তমান লাইভ সিম ব্যালেন্স
+
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  purchases      RechargePurchase[]
+  dailyBalances  RechargeDailyBalance[]
+}
+
+model RechargePurchase {
+  id             String      @id @default(uuid())
+  storeId        String
+  store          Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  simId          String
+  sim            RechargeSim @relation(fields: [simId], references: [id], onDelete: Cascade)
+
+  amount         Float       // কেনা রিচার্জ টাকা (e.g. 5000 BDT)
+  commission     Float       @default(0) // অর্জিত কমিশন (e.g. 135 BDT)
+  totalReceived  Float       // সিমে যোগ হওয়া মোট ব্যালেন্স (Amount + Commission)
+
+  note           String?
+  createdAt      DateTime    @default(now())
+}
+
+model RechargeDailyBalance {
+  id             String      @id @default(uuid())
+  storeId        String
+  store          Store       @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  simId          String
+  sim            RechargeSim @relation(fields: [simId], references: [id], onDelete: Cascade)
+
+  entryDate      DateTime    @default(now()) // হিসাবের তারিখ
+  endingBalance  Float       @default(0)     // দিনশেষে সিমে অবশিষ্ট ব্যালেন্স
+  calculatedSell Float       @default(0)     // সারাদিনের অটো রিচার্জ বিক্রি
+
+  note           String?
+  createdAt      DateTime    @default(now())
 }
