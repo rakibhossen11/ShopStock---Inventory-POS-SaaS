@@ -8,12 +8,11 @@ import {
   RefreshCw, 
   CheckCircle2, 
   Building2, 
-  Phone, 
-  DollarSign,
-  Percent,
   Edit2,
   Trash2,
-  ShieldCheck
+  X,
+  Save,
+  AlertTriangle
 } from "lucide-react";
 
 interface AgentWallet {
@@ -56,6 +55,10 @@ export default function UnifiedWalletsPage() {
   const [personalPhone, setPersonalPhone] = useState("");
   const [personalOpeningBal, setPersonalOpeningBal] = useState<number | "">("");
 
+  // Modals Management States
+  const [editingWallet, setEditingWallet] = useState<AgentWallet | PersonalWallet | null>(null);
+  const [deletingWalletId, setDeletingWalletId] = useState<string | null>(null);
+
   // Fetch All Wallets
   const fetchWallets = async () => {
     setLoading(true);
@@ -85,13 +88,10 @@ export default function UnifiedWalletsPage() {
     fetchWallets();
   }, []);
 
-  // Submit Agent Wallet Form
+  // Submit New Agent Wallet Form
   const handleAgentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!agentPhone) {
-      alert("Account number is required.");
-      return;
-    }
+    if (!agentPhone) return alert("Account number is required.");
 
     setSubmitting(true);
     try {
@@ -125,13 +125,10 @@ export default function UnifiedWalletsPage() {
     }
   };
 
-  // Submit Personal Wallet Form
+  // Submit New Personal Wallet Form
   const handlePersonalSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!personalPhone) {
-      alert("Account number is required.");
-      return;
-    }
+    if (!personalPhone) return alert("Account number is required.");
 
     setSubmitting(true);
     try {
@@ -162,6 +159,65 @@ export default function UnifiedWalletsPage() {
     }
   };
 
+  // Update Wallet Handler
+  const handleUpdateWallet = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingWallet) return;
+
+    setSubmitting(true);
+    const endpoint = activeTab === "AGENT" ? "/api/mfs/agent" : "/api/mfs/personal";
+
+    try {
+      const res = await fetch(`${endpoint}/${editingWallet.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(editingWallet),
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMsg("Wallet updated successfully!");
+        setEditingWallet(null);
+        fetchWallets();
+        setTimeout(() => setSuccessMsg(""), 4000);
+      } else {
+        alert(data.error || "Failed to update wallet");
+      }
+    } catch (err) {
+      alert("Error updating wallet");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Delete Wallet Handler
+  const handleDeleteWallet = async () => {
+    if (!deletingWalletId) return;
+
+    setSubmitting(true);
+    const endpoint = activeTab === "AGENT" ? "/api/mfs/agent" : "/api/mfs/personal";
+
+    try {
+      const res = await fetch(`${endpoint}/${deletingWalletId}`, {
+        method: "DELETE",
+      });
+
+      const data = await res.json();
+      if (data.success) {
+        setSuccessMsg("Wallet deleted successfully!");
+        setDeletingWalletId(null);
+        fetchWallets();
+        setTimeout(() => setSuccessMsg(""), 4000);
+      } else {
+        alert(data.error || "Failed to delete wallet");
+      }
+    } catch (err) {
+      alert("Error deleting wallet");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-[400px] flex items-center justify-center">
@@ -174,9 +230,9 @@ export default function UnifiedWalletsPage() {
   }
 
   return (
-    <div className="max-w-6xl mx-auto my-6 space-y-6 pb-12">
+    <div className="max-w-6xl mx-auto my-6 space-y-6 pb-12 text-xs">
       {/* Top Header */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
             <Building2 className="w-7 h-7 text-emerald-600" />
@@ -191,9 +247,9 @@ export default function UnifiedWalletsPage() {
         <div className="flex items-center bg-slate-100 p-1.5 rounded-xl text-xs font-bold">
           <button
             onClick={() => setActiveTab("AGENT")}
-            className={`px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 ${
+            className={`px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === "AGENT"
-                ? "bg-emerald-600 text-white shadow-sm"
+                ? "bg-emerald-600 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
@@ -202,9 +258,9 @@ export default function UnifiedWalletsPage() {
           </button>
           <button
             onClick={() => setActiveTab("PERSONAL")}
-            className={`px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 ${
+            className={`px-5 py-2.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer ${
               activeTab === "PERSONAL"
-                ? "bg-blue-600 text-white shadow-sm"
+                ? "bg-blue-600 text-white shadow-xs"
                 : "text-slate-600 hover:text-slate-900"
             }`}
           >
@@ -215,7 +271,7 @@ export default function UnifiedWalletsPage() {
       </div>
 
       {successMsg && (
-        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold rounded-xl flex items-center gap-2 shadow-sm">
+        <div className="p-4 bg-emerald-50 border border-emerald-200 text-emerald-900 text-xs font-bold rounded-xl flex items-center gap-2 shadow-xs">
           <CheckCircle2 className="w-5 h-5 text-emerald-600 shrink-0" />
           <span>{successMsg}</span>
         </div>
@@ -224,8 +280,8 @@ export default function UnifiedWalletsPage() {
       {/* Main Grid Content */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         
-        {/* Left Side: Dynamic Add Wallet Form */}
-        <div className="md:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm space-y-4">
+        {/* Left Side: Add Wallet Form */}
+        <div className="md:col-span-1 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs space-y-4">
           <h3 className="font-bold text-slate-800 text-sm border-b border-slate-100 pb-2 flex items-center gap-2">
             <Plus className="w-4 h-4 text-emerald-600" />
             Add New {activeTab === "AGENT" ? "Agent" : "Personal"} Wallet
@@ -250,7 +306,7 @@ export default function UnifiedWalletsPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Account / SIM Phone Number *</label>
+                <label className="font-bold text-slate-700 block mb-1">Account Phone Number *</label>
                 <input
                   type="text"
                   placeholder="01700000000"
@@ -310,7 +366,7 @@ export default function UnifiedWalletsPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-xs shadow-sm mt-2"
+                className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-xs shadow-xs cursor-pointer mt-2"
               >
                 {submitting ? "Saving..." : "Save Agent Wallet"}
               </button>
@@ -346,7 +402,7 @@ export default function UnifiedWalletsPage() {
               </div>
 
               <div>
-                <label className="font-bold text-slate-700 block mb-1">Opening E-Money Balance (BDT)</label>
+                <label className="font-bold text-slate-700 block mb-1">Opening Balance (BDT)</label>
                 <input
                   type="number"
                   placeholder="0.00"
@@ -359,7 +415,7 @@ export default function UnifiedWalletsPage() {
               <button
                 type="submit"
                 disabled={submitting}
-                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-xs shadow-sm mt-2"
+                className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 rounded-xl transition-all flex items-center justify-center gap-2 text-xs shadow-xs cursor-pointer mt-2"
               >
                 {submitting ? "Saving..." : "Save Personal Wallet"}
               </button>
@@ -367,7 +423,7 @@ export default function UnifiedWalletsPage() {
           )}
         </div>
 
-        {/* Right Side: Wallets Cards & List */}
+        {/* Right Side: Wallets Cards & Action Buttons */}
         <div className="md:col-span-2 space-y-4">
           <div className="flex justify-between items-center bg-slate-50 p-3 rounded-xl border border-slate-200 text-xs font-bold text-slate-700">
             <span>{activeTab === "AGENT" ? "Agent Wallets List" : "Personal Wallets List"}</span>
@@ -383,20 +439,35 @@ export default function UnifiedWalletsPage() {
             /* AGENT WALLETS CARDS */
             agentWallets.length === 0 ? (
               <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center text-slate-400 text-xs">
-                No Agent Wallets added yet. Use the form to add one.
+                No Agent Wallets added yet.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {agentWallets.map((wallet) => (
-                  <div key={wallet.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                  <div key={wallet.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3 relative group">
                     <div className="flex justify-between items-start">
                       <div>
                         <span className="font-bold text-slate-900 text-sm block">{wallet.providerName} Agent</span>
                         <span className="text-slate-500 font-mono text-xs">{wallet.accountNumber}</span>
                       </div>
-                      <span className="bg-emerald-50 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-md border border-emerald-100">
-                        AGENT
-                      </span>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setEditingWallet(wallet)}
+                          className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Wallet"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingWalletId(wallet.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Wallet"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="border-t border-slate-100 pt-3">
@@ -416,20 +487,35 @@ export default function UnifiedWalletsPage() {
             /* PERSONAL WALLETS CARDS */
             personalWallets.length === 0 ? (
               <div className="bg-white p-12 rounded-2xl border border-slate-200 text-center text-slate-400 text-xs">
-                No Personal Wallets added yet. Use the form to add one.
+                No Personal Wallets added yet.
               </div>
             ) : (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {personalWallets.map((wallet) => (
-                  <div key={wallet.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-3">
+                  <div key={wallet.id} className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-3">
                     <div className="flex justify-between items-start">
                       <div>
                         <span className="font-bold text-slate-900 text-sm block">{wallet.providerName} Personal</span>
                         <span className="text-slate-500 font-mono text-xs">{wallet.accountNumber}</span>
                       </div>
-                      <span className="bg-blue-50 text-blue-700 text-[10px] font-bold px-2 py-0.5 rounded-md border border-blue-100">
-                        PERSONAL
-                      </span>
+                      
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-1">
+                        <button
+                          onClick={() => setEditingWallet(wallet)}
+                          className="p-1.5 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors cursor-pointer"
+                          title="Edit Wallet"
+                        >
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button
+                          onClick={() => setDeletingWalletId(wallet.id)}
+                          className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                          title="Delete Wallet"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
                     </div>
 
                     <div className="border-t border-slate-100 pt-3">
@@ -443,6 +529,114 @@ export default function UnifiedWalletsPage() {
           )}
         </div>
       </div>
+
+      {/* EDIT WALLET MODAL */}
+      {editingWallet && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
+            <div className="flex justify-between items-center border-b pb-3">
+              <h3 className="font-bold text-slate-900 text-sm flex items-center gap-2">
+                <Edit2 className="w-4 h-4 text-emerald-600" />
+                Edit {activeTab === "AGENT" ? "Agent" : "Personal"} Wallet
+              </h3>
+              <button onClick={() => setEditingWallet(null)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleUpdateWallet} className="space-y-3 text-xs">
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Account Phone Number</label>
+                <input
+                  type="text"
+                  value={editingWallet.accountNumber}
+                  onChange={(e) => setEditingWallet({ ...editingWallet, accountNumber: e.target.value })}
+                  className="w-full border p-2.5 rounded-xl font-bold"
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="font-bold text-slate-700 block mb-1">Current Balance (BDT)</label>
+                <input
+                  type="number"
+                  value={editingWallet.currentBalance}
+                  onChange={(e) => setEditingWallet({ ...editingWallet, currentBalance: Number(e.target.value) })}
+                  className="w-full border p-2.5 rounded-xl font-bold"
+                  required
+                />
+              </div>
+
+              {activeTab === "AGENT" && "cashInCommission" in editingWallet && (
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Cash In Comm.</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editingWallet.cashInCommission}
+                      onChange={(e) => setEditingWallet({ ...editingWallet, cashInCommission: Number(e.target.value) })}
+                      className="w-full border p-2 rounded-lg font-bold"
+                    />
+                  </div>
+                  <div>
+                    <label className="font-bold text-slate-700 block mb-1">Cash Out Comm.</label>
+                    <input
+                      type="number"
+                      step="0.01"
+                      value={editingWallet.cashOutCommission}
+                      onChange={(e) => setEditingWallet({ ...editingWallet, cashOutCommission: Number(e.target.value) })}
+                      className="w-full border p-2 rounded-lg font-bold"
+                    />
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="submit"
+                  disabled={submitting}
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                >
+                  <Save className="w-4 h-4" /> Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* DELETE CONFIRMATION MODAL */}
+      {deletingWalletId && (
+        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-slate-200 text-center space-y-4">
+            <div className="w-12 h-12 bg-rose-50 rounded-full flex items-center justify-center mx-auto text-rose-600">
+              <AlertTriangle className="w-6 h-6" />
+            </div>
+            <div>
+              <h3 className="font-bold text-slate-900 text-sm">Delete Wallet?</h3>
+              <p className="text-slate-500 text-xs mt-1">
+                Are you sure you want to delete this wallet? This action cannot be undone.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setDeletingWalletId(null)}
+                className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition-all cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteWallet}
+                disabled={submitting}
+                className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 rounded-xl transition-all cursor-pointer"
+              >
+                {submitting ? "Deleting..." : "Confirm Delete"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

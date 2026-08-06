@@ -33,9 +33,21 @@ export default function CommissionHistoryPage() {
   });
 
   const [loading, setLoading] = useState(true);
-  const [range, setRange] = useState<"today" | "yesterday" | "7days" | "30days" | "thisMonth" | "custom">("today");
+  const [range, setRange] = useState<"today" | "yesterday" | "7days" | "30days" | "thisMonth" | "custom">("7days");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+
+  // Helper Function for DD/MM/YYYY Date Formatting
+  const formatDateDMY = (dateString: string) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return dateString;
+    return date.toLocaleDateString("en-GB", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    });
+  };
 
   const fetchCommissionData = async () => {
     setLoading(true);
@@ -48,9 +60,13 @@ export default function CommissionHistoryPage() {
       const res = await fetch(query);
       const result = await res.json();
 
-      if (result.success) {
-        setHistory(result.data.history);
-        setSummary(result.data.summary);
+      if (result.success && result.data) {
+        setHistory(result.data.history || []);
+        setSummary({
+          totalAgentCommission: Number(result.data.summary?.totalAgentCommission) || 0,
+          totalPersonalProfit: Number(result.data.summary?.totalPersonalProfit) || 0,
+          grandTotalIncome: Number(result.data.summary?.grandTotalIncome) || 0,
+        });
       }
     } catch (err) {
       console.error("Failed to load commission history", err);
@@ -64,65 +80,71 @@ export default function CommissionHistoryPage() {
   }, [range]);
 
   return (
-    <div className="max-w-6xl mx-auto my-6 space-y-6 pb-12">
+    <div className="max-w-6xl mx-auto my-6 space-y-6 pb-12 text-xs">
       {/* Header */}
-      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 shadow-xs flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
             <Award className="w-7 h-7 text-amber-500" />
             MFS Commission & Profit History
           </h1>
           <p className="text-xs text-slate-500 mt-1">
-            Track day-wise MFS agent commissions and personal wallet profits.
+            Track day-wise MFS agent commissions and personal wallet profits across all wallets.
           </p>
         </div>
 
         {/* Date Filter Buttons */}
-        <div className="flex flex-wrap items-center gap-1.5 bg-slate-100 p-1 rounded-xl text-xs font-bold">
+        <div className="flex flex-wrap items-center gap-1 bg-slate-100 p-1 rounded-xl font-bold">
           <button
+            type="button"
             onClick={() => setRange("today")}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              range === "today" ? "bg-amber-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              range === "today" ? "bg-amber-500 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             Today
           </button>
           <button
+            type="button"
             onClick={() => setRange("yesterday")}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              range === "yesterday" ? "bg-amber-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              range === "yesterday" ? "bg-amber-500 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             Yesterday
           </button>
           <button
+            type="button"
             onClick={() => setRange("7days")}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              range === "7days" ? "bg-amber-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              range === "7days" ? "bg-amber-500 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             7 Days
           </button>
           <button
+            type="button"
             onClick={() => setRange("30days")}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              range === "30days" ? "bg-amber-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              range === "30days" ? "bg-amber-500 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             30 Days
           </button>
           <button
+            type="button"
             onClick={() => setRange("thisMonth")}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              range === "thisMonth" ? "bg-amber-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              range === "thisMonth" ? "bg-amber-500 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             This Month
           </button>
           <button
+            type="button"
             onClick={() => setRange("custom")}
-            className={`px-3 py-1.5 rounded-lg transition-all ${
-              range === "custom" ? "bg-amber-500 text-white shadow-sm" : "text-slate-600 hover:text-slate-900"
+            className={`px-3 py-1.5 rounded-lg transition-all cursor-pointer ${
+              range === "custom" ? "bg-amber-500 text-white shadow-xs" : "text-slate-600 hover:text-slate-900"
             }`}
           >
             Custom
@@ -132,7 +154,7 @@ export default function CommissionHistoryPage() {
 
       {/* Custom Date Inputs */}
       {range === "custom" && (
-        <div className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 text-xs shadow-sm">
+        <div className="p-4 bg-white border border-slate-200 rounded-2xl flex items-center gap-3 text-xs shadow-xs">
           <input
             type="date"
             value={startDate}
@@ -147,8 +169,9 @@ export default function CommissionHistoryPage() {
             className="border border-slate-300 p-2 rounded-xl font-bold text-slate-800"
           />
           <button
+            type="button"
             onClick={fetchCommissionData}
-            className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-1.5"
+            className="bg-amber-500 hover:bg-amber-600 text-white font-bold px-4 py-2 rounded-xl transition-all flex items-center gap-1.5 cursor-pointer"
           >
             <Filter className="w-4 h-4" /> Apply Filter
           </button>
@@ -157,36 +180,36 @@ export default function CommissionHistoryPage() {
 
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
             <Smartphone className="w-4 h-4 text-emerald-600" /> Total Agent Commission
           </span>
           <p className="text-2xl font-black text-emerald-600">
-            ৳{summary.totalAgentCommission.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            ৳{summary.totalAgentCommission.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm space-y-1">
-          <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-xs space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
             <Wallet className="w-4 h-4 text-blue-600" /> Total Personal Profit
           </span>
           <p className="text-2xl font-black text-blue-600">
-            ৳{summary.totalPersonalProfit.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            ৳{summary.totalPersonalProfit.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
 
-        <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-sm space-y-1">
-          <span className="text-xs font-bold text-slate-400 flex items-center gap-1.5">
+        <div className="bg-slate-900 text-white p-5 rounded-2xl shadow-xs space-y-1">
+          <span className="text-[11px] font-bold text-slate-400 flex items-center gap-1.5 uppercase tracking-wider">
             <TrendingUp className="w-4 h-4 text-amber-400" /> Grand Total Earnings
           </span>
           <p className="text-2xl font-black text-amber-400">
-            ৳{summary.grandTotalIncome.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+            ৳{summary.grandTotalIncome.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </p>
         </div>
       </div>
 
       {/* Day Wise Commission Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex justify-between items-center">
           <h3 className="font-bold text-slate-800 text-sm flex items-center gap-2">
             <Calendar className="w-4 h-4 text-amber-500" /> Day-Wise Earnings Breakdown
@@ -216,21 +239,16 @@ export default function CommissionHistoryPage() {
                 {history.map((row) => (
                   <tr key={row.date} className="hover:bg-slate-50/80 transition-colors">
                     <td className="p-3.5 font-bold text-slate-700">
-                      {new Date(row.date).toLocaleDateString("bn-BD", {
-                        weekday: "short",
-                        year: "numeric",
-                        month: "short",
-                        day: "numeric",
-                      })}
+                      {formatDateDMY(row.date)}
                     </td>
                     <td className="p-3.5 font-bold text-emerald-600">
-                      +৳{row.agentCommission.toFixed(2)}
+                      +৳{Number(row.agentCommission || 0).toFixed(2)}
                     </td>
                     <td className="p-3.5 font-bold text-blue-600">
-                      +৳{row.personalProfit.toFixed(2)}
+                      +৳{Number(row.personalProfit || 0).toFixed(2)}
                     </td>
                     <td className="p-3.5 font-black text-amber-600 text-right">
-                      ৳{row.total.toFixed(2)}
+                      ৳{Number(row.total || 0).toFixed(2)}
                     </td>
                   </tr>
                 ))}

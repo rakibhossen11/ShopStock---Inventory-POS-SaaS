@@ -42,7 +42,7 @@ export async function GET(request: Request) {
       endDate.setHours(23, 59, 59, 999);
     }
 
-    // ১. MfsOrder (এজেন্ট সিমে সেল পেজ লেনদেনের কমিশন)
+    // ১. MfsOrder (এজেন্ট সেলের কমিশন)
     const agentOrders = await prisma.mfsOrder.findMany({
       where: {
         storeId,
@@ -54,7 +54,7 @@ export async function GET(request: Request) {
       },
     });
 
-    // ২. MfsTransaction (পার্সোনাল সিমে সার্ভিস চার্জ/বাড়তি লাভ)
+    // ২. MfsTransaction (পার্সোনাল ট্রানজেকশন সার্ভিস চার্জ/প্রফিট)
     const personalTxs = await prisma.mfsTransaction.findMany({
       where: {
         storeId,
@@ -66,7 +66,7 @@ export async function GET(request: Request) {
       },
     });
 
-    // ৩. MfsDailyStock (স্টক পেজে ম্যানুয়ালি ইনপুট দেওয়া কমিশন)
+    // ৩. MfsDailyStock (স্টক পেজে ইনপুট দেওয়া সব ওয়ালেটের ডেইলি কমিশন)
     const dailyStocks = await prisma.mfsDailyStock.findMany({
       where: {
         storeId,
@@ -79,45 +79,50 @@ export async function GET(request: Request) {
       },
     });
 
-    // 📊 দিনভিত্তিক (Date Wise) ডাটা গ্রুপিং
+    // 📊 দিনভিত্তিক (Date-Wise) ডাটা গ্রুপিং ম্যাপ
     const dailyMap: Record<string, { date: string; agentCommission: number; personalProfit: number; total: number }> = {};
 
+    // ক) MfsOrder থেকে কমিশন যোগ
     agentOrders.forEach((order) => {
       const dateKey = order.createdAt.toISOString().split("T")[0];
       if (!dailyMap[dateKey]) {
         dailyMap[dateKey] = { date: dateKey, agentCommission: 0, personalProfit: 0, total: 0 };
       }
-      dailyMap[dateKey].agentCommission += order.commissionAmount;
-      dailyMap[dateKey].total += order.commissionAmount;
+      const amount = Number(order.commissionAmount) || 0;
+      dailyMap[dateKey].agentCommission += amount;
+      dailyMap[dateKey].total += amount;
     });
 
+    // খ) MfsTransaction থেকে প্রফিট যোগ
     personalTxs.forEach((tx) => {
       const dateKey = tx.createdAt.toISOString().split("T")[0];
       if (!dailyMap[dateKey]) {
         dailyMap[dateKey] = { date: dateKey, agentCommission: 0, personalProfit: 0, total: 0 };
       }
-      dailyMap[dateKey].personalProfit += tx.profitAmount;
-      dailyMap[dateKey].total += tx.profitAmount;
+      const amount = Number(tx.profitAmount) || 0;
+      dailyMap[dateKey].personalProfit += amount;
+      dailyMap[dateKey].total += amount;
     });
 
+    // গ) 🎯 MfsDailyStock থেকে সব ওয়ালেটের আনরেস্ট্রিক্টেড কমিশন যোগ (Fix Applied Here)
     dailyStocks.forEach((stock) => {
       const dateKey = stock.entryDate.toISOString().split("T")[0];
       if (!dailyMap[dateKey]) {
         dailyMap[dateKey] = { date: dateKey, agentCommission: 0, personalProfit: 0, total: 0 };
       }
+
+      const profit = Number(stock.totalProfit) || 0;
+
       if (stock.walletCategory === "AGENT") {
-        if (dailyMap[dateKey].agentCommission === 0) {
-          dailyMap[dateKey].agentCommission += stock.totalProfit;
-          dailyMap[dateKey].total += stock.totalProfit;
-        }
+        dailyMap[dateKey].agentCommission += profit;
+        dailyMap[dateKey].total += profit;
       } else {
-        if (dailyMap[dateKey].personalProfit === 0) {
-          dailyMap[dateKey].personalProfit += stock.totalProfit;
-          dailyMap[dateKey].total += stock.totalProfit;
-        }
+        dailyMap[dateKey].personalProfit += profit;
+        dailyMap[dateKey].total += profit;
       }
     });
 
+    // তারিখ অনুযায়ী সাজানো (Newest First)
     const commissionHistory = Object.values(dailyMap).sort(
       (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()
     );
