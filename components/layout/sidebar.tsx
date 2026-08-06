@@ -43,6 +43,10 @@ const navItems: NavItem[] = [
     icon: Smartphone,
     subItems: [
       { title: "Dashboard & Wallets", href: "/mfs" },
+      { title: "MFS Sell", href: "/mfs/sell" },
+      { title: "MFS Stock", href: "/mfs/stock" },
+      { title: "Agent Wallets", href: "/mfs/agentwallet" },
+      { title: "Personal Wallets", href: "/mfs/personal" },
       { title: "New Transaction", href: "/mfs/transaction" },
       { title: "Mobile Recharge", href: "/mfs/recharge" },
       { title: "History & Profit", href: "/mfs/history" },

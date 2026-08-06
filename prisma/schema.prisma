@@ -6,6 +6,10 @@ datasource db {
   provider = "postgresql"
 }
 
+// ------------------------------------------------------
+// ENUMS
+// ------------------------------------------------------
+
 enum Role {
   STORE_OWNER
   MANAGER
@@ -29,28 +33,64 @@ enum AdjustmentType {
   SUBTRACT
 }
 
-model Store {
-  id                String            @id
-  name              String
-  address           String?
-  phone             String?
-  currency          String            @default("BDT")
-  createdAt         DateTime          @default(now())
-  updatedAt         DateTime          @updatedAt
+enum MfsAccountType {
+  AGENT
+  MERCHANT
+  PERSONAL
+}
 
-  users             User[]
-  cashRegisters     CashRegister[]
-  suppliers         Supplier[]
-  purchaseOrders    PurchaseOrder[]
-  supplierPayments  SupplierPayment[]
-  categories        Category[]
-  products          Product[]
-  stockAdjustments  StockAdjustment[]
-  customers         Customer[]
-  customerPayments  CustomerPayment[]
-  saleOrders        SaleOrder[]
-  expenses          Expense[]         // 👈 যুক্ত করা হয়েছে
-  expenseCategories ExpenseCategory[] // 👈 যুক্ত করা হয়েছে
+enum MfsCategoryType {
+  CASH_IN
+  CASH_OUT
+  PAY_BILL
+  B2B_SEND
+  B2B_RECEIVED
+}
+
+enum CommissionType {
+  FLAT_PER_THOUSAND
+  PERCENTAGE
+}
+
+enum MfsTxType {
+  BUY_EMONEY
+  SELL_EMONEY
+  COMMISSION_GAIN
+}
+
+// ------------------------------------------------------
+// STORE MODEL
+// ------------------------------------------------------
+
+model Store {
+  id                  String               @id
+  name                String
+  address             String?
+  phone               String?
+  currency            String               @default("BDT")
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+
+  users               User[]
+  cashRegisters       CashRegister[]
+  suppliers           Supplier[]
+  purchaseOrders      PurchaseOrder[]
+  supplierPayments    SupplierPayment[]
+  categories          Category[]
+  products            Product[]
+  stockAdjustments    StockAdjustment[]
+  customers           Customer[]
+  customerPayments    CustomerPayment[]
+  saleOrders          SaleOrder[]
+  expenses            Expense[]
+  expenseCategories   ExpenseCategory[]
+  mfsAgentWallets     MFSAgentWallet[]
+  mfsPersonalWallets  MFSPersonalWallet[]
+  mfsCategories       MfsCategory[]
+  mfsTransactions     MfsTransaction[]
+  mfsOrders           MfsOrder[]
+  dailyClosings       DailyClosing[]
+  mfsDailyStocks      MfsDailyStock[]
 }
 
 model User {
@@ -67,6 +107,10 @@ model User {
 
   cashRegisters CashRegister[]
 }
+
+// ------------------------------------------------------
+// CASH REGISTER & TRANSACTIONS
+// ------------------------------------------------------
 
 model CashRegister {
   id              String            @id @default(uuid())
@@ -98,6 +142,10 @@ model CashTransaction {
   reason     String?
   createdAt  DateTime        @default(now())
 }
+
+// ------------------------------------------------------
+// SUPPLIER & PURCHASES
+// ------------------------------------------------------
 
 model Supplier {
   id             String            @id @default(uuid())
@@ -215,6 +263,10 @@ model SupplierPayment {
   createdAt     DateTime @default(now())
 }
 
+// ------------------------------------------------------
+// STOCK ADJUSTMENTS
+// ------------------------------------------------------
+
 model StockAdjustment {
   id        String                @id @default(uuid())
   storeId   String
@@ -239,6 +291,10 @@ model StockAdjustmentItem {
 
   createdAt    DateTime        @default(now())
 }
+
+// ------------------------------------------------------
+// CUSTOMERS & SALES
+// ------------------------------------------------------
 
 model Customer {
   id         String            @id @default(uuid())
@@ -311,10 +367,15 @@ model SaleItem {
 
   quantity    Int
   unitPrice   Float
+  costPrice   Float     @default(0)
   totalPrice  Float
 
   createdAt   DateTime  @default(now())
 }
+
+// ------------------------------------------------------
+// EXPENSES
+// ------------------------------------------------------
 
 model ExpenseCategory {
   id        String    @id @default(uuid())
@@ -343,4 +404,166 @@ model Expense {
   note          String?
 
   createdAt     DateTime         @default(now())
+}
+
+// ------------------------------------------------------
+// MFS AGENT WALLETS, PERSONAL WALLETS & TRANSACTIONS
+// ------------------------------------------------------
+
+model MFSAgentWallet {
+  id                String          @id @default(uuid())
+  storeId           String
+  store             Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  providerName      String
+  accountNumber     String
+  accountType       MfsAccountType  @default(AGENT)
+
+  openingBalance    Float           @default(0)
+  currentBalance    Float           @default(0)
+
+  commissionType    CommissionType  @default(FLAT_PER_THOUSAND)
+  cashInCommission  Float           @default(4.12)
+  cashOutCommission Float           @default(4.12)
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  mfsOrders         MfsOrder[]
+  dailyStocks       MfsDailyStock[]
+}
+
+model MFSPersonalWallet {
+  id                String           @id @default(uuid())
+  storeId           String
+  store             Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  providerName      String
+  accountNumber     String
+  accountType       MfsAccountType   @default(PERSONAL)
+
+  openingBalance    Float            @default(0)
+  currentBalance    Float            @default(0)
+
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  transactions      MfsTransaction[]
+  dailyStocks       MfsDailyStock[]
+}
+
+model MfsCategory {
+  id          String          @id @default(uuid())
+  storeId     String
+  store       Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  name        String
+  type        MfsCategoryType
+  description String?
+
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+}
+
+model MfsTransaction {
+  id                String            @id @default(uuid())
+  storeId           String
+  store             Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  personalWalletId  String
+  personalWallet    MFSPersonalWallet @relation(fields: [personalWalletId], references: [id], onDelete: Cascade)
+
+  type              MfsTxType
+  
+  cashAmount        Float
+  walletAmount      Float
+  profitAmount      Float             @default(0)
+
+  referenceNo       String?
+  note              String?
+
+  createdAt         DateTime          @default(now())
+}
+
+model MfsOrder {
+  id                String          @id @default(uuid())
+  storeId           String
+  store             Store           @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  agentWalletId     String
+  agentWallet       MFSAgentWallet  @relation(fields: [agentWalletId], references: [id], onDelete: Cascade)
+
+  transactionType   MfsCategoryType
+  
+  customerPhone     String?
+  amount            Float
+  commissionAmount  Float           @default(0)
+  netCashImpact     Float
+  netWalletImpact   Float
+
+  referenceTrxId    String?
+  note              String?
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+}
+
+// ------------------------------------------------------
+// DAILY CLOSING & UNIFIED MFS STOCK
+// ------------------------------------------------------
+
+model DailyClosing {
+  id                    String   @id @default(uuid())
+  storeId               String
+  store                 Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  closingDate           DateTime @default(now())
+
+  totalShopSales        Float    @default(0)
+  shopCostOfGoods       Float    @default(0)
+  shopGrossProfit       Float    @default(0)
+  totalExpenses         Float    @default(0)
+
+  openingCash           Float    @default(0)
+  closingCash           Float    @default(0)
+  systemCalculatedCash  Float    @default(0)
+
+  agentWalletBalance    Float    @default(0)
+  agentCommissionEarned Float    @default(0)
+
+  personalWalletBalance Float    @default(0)
+  personalExtraEarned   Float    @default(0)
+
+  totalStartingAssets   Float    @default(0)
+  totalEndingAssets     Float    @default(0)
+  discrepancyAmount     Float    @default(0)
+  netDayProfit          Float    @default(0)
+
+  note                  String?
+  createdAt             DateTime @default(now())
+}
+
+model MfsDailyStock {
+  id                String             @id @default(uuid())
+  storeId           String
+  store             Store              @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  walletCategory    String             @default("AGENT") // "AGENT" | "PERSONAL"
+
+  agentWalletId     String?
+  agentWallet       MFSAgentWallet?    @relation(fields: [agentWalletId], references: [id], onDelete: Cascade)
+
+  personalWalletId  String?
+  personalWallet    MFSPersonalWallet? @relation(fields: [personalWalletId], references: [id], onDelete: Cascade)
+
+  entryDate         DateTime           @default(now())
+
+  totalIn           Float              @default(0)
+  totalOut          Float              @default(0)
+  totalProfit       Float              @default(0)
+  endingBalance     Float              @default(0)
+
+  note              String?
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
 }
