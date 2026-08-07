@@ -7,12 +7,10 @@ import {
   Phone, 
   Mail, 
   MapPin, 
-  DollarSign, 
   CreditCard, 
   Trash2, 
   Loader2, 
   X, 
-  CheckCircle2, 
   Search,
   Building2
 } from "lucide-react";
@@ -71,7 +69,7 @@ export default function SuppliersPage() {
     fetchSuppliers();
   }, []);
 
-  // ১. নতুন সাপ্লাইয়ার সাবমিট
+  // ১. নতুন সাপ্লাইয়ার সাবমিট
   const handleAddSupplier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name || !phone) return;
@@ -110,17 +108,18 @@ export default function SuppliersPage() {
     }
   };
 
-  // ২. পেমেন্ট সাবমিট
+  // ২. পেমেন্ট সাবমিট (সঠিক এপিআই ও অ্যাকশন সহ)
   const handlePaySupplier = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedSupplier || !payAmount || Number(payAmount) <= 0) return;
 
     setIsPaying(true);
     try {
-      const res = await fetch("/api/suppliers/payment", {
+      const res = await fetch("/api/suppliers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          action: "PAYMENT",
           supplierId: selectedSupplier.id,
           amount: Number(payAmount),
           paymentMethod: payMethod,
@@ -170,9 +169,9 @@ export default function SuppliersPage() {
   );
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12">
+    <div className="max-w-6xl mx-auto space-y-6 pb-12 text-xs">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
             <Truck className="w-7 h-7 text-emerald-600" />
@@ -185,7 +184,7 @@ export default function SuppliersPage() {
 
         <button
           onClick={() => setModalOpen(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-xs transition-all cursor-pointer"
         >
           <UserPlus className="w-4 h-4" />
           <span>Add New Supplier</span>
@@ -199,15 +198,15 @@ export default function SuppliersPage() {
           placeholder="Search supplier by name or phone..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-white border border-slate-200 pl-10 pr-4 py-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-full bg-white border border-slate-200 pl-10 pr-4 py-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
         />
         <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
       </div>
 
       {/* Supplier Grid / Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-500 flex items-center justify-center gap-2 text-sm">
+          <div className="p-12 text-center text-slate-500 flex items-center justify-center gap-2 text-xs">
             <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
             Loading suppliers...
           </div>
@@ -264,14 +263,15 @@ export default function SuppliersPage() {
                       )}
                     </td>
 
+                    {/* 🎯 বকেয়া এবং অ্যাডভান্স ডিসপ্লে লজিক সংশোধন */}
                     <td className="p-4 font-bold">
-                      {s.currentBalance < 0 ? (
+                      {s.currentBalance > 0 ? (
                         <span className="text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-100 inline-block">
-                          Due: ৳ {Math.abs(s.currentBalance).toLocaleString()}
+                          Due: ৳ {s.currentBalance.toLocaleString()}
                         </span>
-                      ) : s.currentBalance > 0 ? (
+                      ) : s.currentBalance < 0 ? (
                         <span className="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 inline-block">
-                          Advance: ৳ {s.currentBalance.toLocaleString()}
+                          Advance: ৳ {Math.abs(s.currentBalance).toLocaleString()}
                         </span>
                       ) : (
                         <span className="text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg inline-block">
@@ -286,13 +286,13 @@ export default function SuppliersPage() {
                           setSelectedSupplier(s);
                           setPayModalOpen(true);
                         }}
-                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors inline-flex items-center gap-1"
+                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors inline-flex items-center gap-1 cursor-pointer"
                       >
                         <CreditCard className="w-3.5 h-3.5" /> Pay Due
                       </button>
                       <button
                         onClick={() => handleDelete(s.id, s.name)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -307,14 +307,14 @@ export default function SuppliersPage() {
 
       {/* MODAL 1: Add New Supplier */}
       {modalOpen && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                 <Truck className="w-5 h-5 text-emerald-600" />
                 Add New Supplier
               </h3>
-              <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -327,7 +327,7 @@ export default function SuppliersPage() {
                   placeholder="e.g. Acme Electronics Ltd."
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                   required
                 />
               </div>
@@ -339,7 +339,7 @@ export default function SuppliersPage() {
                   placeholder="01700000000"
                   value={phone}
                   onChange={(e) => setPhone(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                   required
                 />
               </div>
@@ -352,7 +352,7 @@ export default function SuppliersPage() {
                     placeholder="e.g. Mr. Rahim"
                     value={contactPerson}
                     onChange={(e) => setContactPerson(e.target.value)}
-                    className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                   />
                 </div>
                 <div>
@@ -362,7 +362,7 @@ export default function SuppliersPage() {
                     placeholder="acme@vendor.com"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                    className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                   />
                 </div>
               </div>
@@ -374,7 +374,7 @@ export default function SuppliersPage() {
                   placeholder="e.g. Motijheel, Dhaka"
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                 />
               </div>
 
@@ -384,10 +384,10 @@ export default function SuppliersPage() {
                 </label>
                 <input
                   type="number"
-                  placeholder="0 (Negative for due, positive for advance)"
+                  placeholder="0 (Positive for due, negative for advance)"
                   value={openingBalance}
                   onChange={(e) => setOpeningBalance(e.target.value === "" ? "" : Number(e.target.value))}
-                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono"
+                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-mono font-bold"
                 />
               </div>
 
@@ -395,14 +395,14 @@ export default function SuppliersPage() {
                 <button
                   type="button"
                   onClick={() => setModalOpen(false)}
-                  className="w-1/2 border border-slate-200 py-2.5 rounded-xl font-semibold text-slate-600"
+                  className="w-1/2 border border-slate-200 py-2.5 rounded-xl font-semibold text-slate-600 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-all"
+                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-all cursor-pointer"
                 >
                   {isSubmitting ? "Saving..." : "Create Supplier"}
                 </button>
@@ -414,14 +414,14 @@ export default function SuppliersPage() {
 
       {/* MODAL 2: Record Supplier Payment */}
       {payModalOpen && selectedSupplier && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-emerald-600" />
                 Make Supplier Payment
               </h3>
-              <button onClick={() => setPayModalOpen(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setPayModalOpen(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -431,7 +431,7 @@ export default function SuppliersPage() {
               <p className="text-slate-500">
                 Current Due:{" "}
                 <span className="font-bold text-rose-600">
-                  ৳ {Math.abs(selectedSupplier.currentBalance).toLocaleString()}
+                  ৳ {selectedSupplier.currentBalance > 0 ? selectedSupplier.currentBalance.toLocaleString() : "0"}
                 </span>
               </p>
             </div>
@@ -455,7 +455,7 @@ export default function SuppliersPage() {
                 <select
                   value={payMethod}
                   onChange={(e) => setPayMethod(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                 >
                   <option value="CASH">CASH</option>
                   <option value="BANK">BANK TRANSFER</option>
@@ -471,7 +471,7 @@ export default function SuppliersPage() {
                   placeholder="e.g. TRX90821 or Cheque #0021"
                   value={payRef}
                   onChange={(e) => setPayRef(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                 />
               </div>
 
@@ -479,14 +479,14 @@ export default function SuppliersPage() {
                 <button
                   type="button"
                   onClick={() => setPayModalOpen(false)}
-                  className="w-1/2 border border-slate-200 py-2.5 rounded-xl font-semibold text-slate-600"
+                  className="w-1/2 border border-slate-200 py-2.5 rounded-xl font-semibold text-slate-600 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPaying}
-                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-all"
+                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-all cursor-pointer"
                 >
                   {isPaying ? "Recording..." : "Confirm Payment"}
                 </button>

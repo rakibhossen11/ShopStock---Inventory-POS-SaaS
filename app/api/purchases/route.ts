@@ -36,7 +36,17 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    const { supplierId, invoiceNo, paidAmount, note, items } = await request.json();
+    const { storeId, userId } = currentUser;
+    const body = await request.json();
+
+    const { 
+      supplierId, 
+      invoiceNo, 
+      paidAmount, 
+      paymentMethod, 
+      note, 
+      items 
+    } = body;
 
     if (!supplierId || !invoiceNo || !items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json(
@@ -45,7 +55,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // মোট পারচেজ অ্যামাউন্ট হিসাব
     const totalAmount = items.reduce(
       (sum: number, item: { quantity: number; unitPrice: number }) =>
         sum + Number(item.quantity || 0) * Number(item.unitPrice || 0),
@@ -53,20 +62,25 @@ export async function POST(request: Request) {
     );
 
     const actualPaid = Number(paidAmount) || 0;
-    const dueAmount = totalAmount - actualPaid;
+    const dueAmount = Math.max(0, totalAmount - actualPaid);
+    const formattedInvoiceNo = String(invoiceNo).trim();
 
-    // Prisma Transaction-এ সবকিছু একসাথে আপডেট করা
+    const activeRegister = await prisma.cashRegister.findFirst({
+      where: { storeId, userId, status: "OPEN" },
+    });
+
     const result = await prisma.$transaction(async (tx) => {
       // ১. পারচেজ অর্ডার তৈরি
       const purchaseOrder = await tx.purchaseOrder.create({
         data: {
-          storeId: currentUser.storeId,
+          storeId,
           supplierId,
-          invoiceNo: String(invoiceNo).trim(),
+          invoiceNo: formattedInvoiceNo,
           totalAmount,
           paidAmount: actualPaid,
           dueAmount,
           note: note ? String(note).trim() : null,
+          status: "RECEIVED",
           items: {
             create: items.map((item: { productId: string; quantity: number; unitPrice: number }) => ({
               productId: item.productId,
@@ -79,23 +93,49 @@ export async function POST(request: Request) {
         include: { items: true },
       });
 
-      // ২. স্টক বৃদ্ধি ও ক্রয়মূল্য আপডেট
+      // ২. স্টক বৃদ্ধি ও ক্রয়মূল্য আপডেট
       for (const item of items) {
         await tx.product.update({
           where: { id: item.productId },
           data: {
-            stock: { increment: Number(item.quantity) }, // স্টক প্লাস
-            costPrice: Number(item.unitPrice), // লেটেস্ট ক্রয়মূল্য সেভ
+            stock: { increment: Number(item.quantity) },
+            costPrice: Number(item.unitPrice),
           },
         });
       }
 
-      // ৩. সাপ্লাইয়ার বকেয়া হিসাব
+      // ৩. SupplierPayment টেবিলে পেমেন্ট রেকর্ড তৈরি
+      if (actualPaid > 0) {
+        await tx.supplierPayment.create({
+          data: {
+            storeId,
+            supplierId,
+            amount: actualPaid,
+            paymentMethod: paymentMethod || "CASH",
+            referenceNo: formattedInvoiceNo,
+            note: `Purchase Order Payment (${formattedInvoiceNo})`,
+          },
+        });
+      }
+
+      // ৪. ক্যাশ আউট
+      if (activeRegister && (paymentMethod === "CASH" || !paymentMethod) && actualPaid > 0) {
+        await tx.cashTransaction.create({
+          data: {
+            registerId: activeRegister.id,
+            type: "CASH_OUT",
+            amount: actualPaid,
+            reason: `Purchase Payment (${formattedInvoiceNo})`,
+          },
+        });
+      }
+
+      // 🎯 ৫. সাপ্লাইয়ারের বকেয়া প্লাস করা (Due যোগ হবে)
       if (dueAmount > 0) {
         await tx.supplier.update({
           where: { id: supplierId },
           data: {
-            currentBalance: { decrement: dueAmount }, // বকেয়া মাইনাসের দিকে যাবে
+            currentBalance: { increment: dueAmount },
           },
         });
       }
@@ -103,9 +143,13 @@ export async function POST(request: Request) {
       return purchaseOrder;
     });
 
-    return NextResponse.json({ success: true, data: result });
-  } catch (error) {
+    return NextResponse.json({ 
+      success: true, 
+      data: result,
+      message: "Purchase completed and payment recorded in history!"
+    });
+  } catch (error: any) {
     console.error("Create Purchase Error:", error);
-    return NextResponse.json({ success: false, error: "Failed to create purchase order" }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message || "Failed to create purchase order" }, { status: 500 });
   }
 }

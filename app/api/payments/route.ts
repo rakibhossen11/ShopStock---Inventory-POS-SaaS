@@ -10,20 +10,28 @@ export async function GET() {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    const { storeId } = currentUser;
+
     const [customerPayments, supplierPayments, expenses] = await Promise.all([
       prisma.customerPayment.findMany({
-        where: { storeId: currentUser.storeId },
-        include: { customer: { select: { name: true, phone: true } } },
+        where: { storeId },
+        include: { 
+          customer: { select: { name: true, phone: true } } 
+        },
         orderBy: { createdAt: "desc" },
       }),
       prisma.supplierPayment.findMany({
-        where: { storeId: currentUser.storeId },
-        include: { supplier: { select: { name: true, phone: true } } },
+        where: { storeId },
+        include: { 
+          supplier: { select: { name: true, phone: true } } 
+        },
         orderBy: { createdAt: "desc" },
       }),
       prisma.expense.findMany({
-        where: { storeId: currentUser.storeId },
-        include: { category: { select: { name: true } } },
+        where: { storeId },
+        include: { 
+          category: { select: { name: true } } 
+        },
         orderBy: { createdAt: "desc" },
       }),
     ]);
@@ -42,7 +50,7 @@ export async function GET() {
   }
 }
 
-// ২. নতুন শপ এক্সপ্রেস বা খরচ রেকর্ড করা (POST)
+// ২. নতুন শপ এক্সপেন্স বা খরচ রেকর্ড করা (POST)
 export async function POST(request: Request) {
   try {
     const currentUser = await getCurrentUser();
@@ -58,7 +66,6 @@ export async function POST(request: Request) {
 
     const expenseAmount = Number(amount);
 
-    // active cash register চেক
     const activeRegister = await prisma.cashRegister.findFirst({
       where: { storeId: currentUser.storeId, userId: currentUser.userId, status: "OPEN" },
     });
