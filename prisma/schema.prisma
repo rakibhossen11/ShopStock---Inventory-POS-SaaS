@@ -72,7 +72,7 @@ model Store {
   updatedAt             DateTime               @updatedAt
 
   users                 User[]
-  cashRegisters         CashRegister[]
+  cashRegisters        CashRegister[]
   suppliers             Supplier[]
   purchaseOrders        PurchaseOrder[]
   supplierPayments      SupplierPayment[]
@@ -92,7 +92,7 @@ model Store {
   dailyClosings         DailyClosing[]
   mfsDailyStocks        MfsDailyStock[]
   
-  // 👈 Recharge Module Relations
+  // Recharge Module Relations
   rechargeSims          RechargeSim[]
   rechargePurchases     RechargePurchase[]
   rechargeDailyBalances RechargeDailyBalance[]
@@ -124,10 +124,10 @@ model CashRegister {
   userId          String
   user            User              @relation(fields: [userId], references: [id])
 
-  openingBalance  Float
-  closingBalance  Float?
+  openingBalance Float
+  closingBalance Float?
   expectedBalance Float?
-  difference      Float?
+  difference     Float?
 
   status          ShiftStatus       @default(OPEN)
   openedAt        DateTime          @default(now())
@@ -200,7 +200,7 @@ model Product {
   barcode              String?
 
   costPrice            Float                 @default(0)
-  sellingPrice         Float                 @default(0)
+  sellingPrice          Float                 @default(0)
 
   stock                Int                   @default(0)
   minStockAlert        Int                   @default(5)
@@ -348,6 +348,7 @@ model SaleOrder {
   subTotal      Float
   discount      Float      @default(0)
   grandTotal    Float
+  profitAmount  Float      @default(0) // 👈 FIXED: Unknown argument problem solved!
 
   paidAmount    Float      @default(0)
   dueAmount     Float      @default(0)
@@ -439,19 +440,19 @@ model MFSAgentWallet {
 }
 
 model MFSPersonalWallet {
-  id                String           @id @default(uuid())
+  id                String            @id @default(uuid())
   storeId           String
-  store             Store            @relation(fields: [storeId], references: [id], onDelete: Cascade)
+  store             Store             @relation(fields: [storeId], references: [id], onDelete: Cascade)
 
   providerName      String
   accountNumber     String
-  accountType       MfsAccountType   @default(PERSONAL)
+  accountType       MfsAccountType    @default(PERSONAL)
 
-  openingBalance    Float            @default(0)
-  currentBalance    Float            @default(0)
+  openingBalance    Float             @default(0)
+  currentBalance    Float             @default(0)
 
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
 
   transactions      MfsTransaction[]
   dailyStocks       MfsDailyStock[]
@@ -531,7 +532,7 @@ model DailyClosing {
 
   openingCash           Float    @default(0)
   closingCash           Float    @default(0)
-  systemCalculatedCash  Float    @default(0)
+  systemCalculatedCash Float    @default(0)
 
   agentWalletBalance    Float    @default(0)
   agentCommissionEarned Float    @default(0)
@@ -603,7 +604,7 @@ model RechargePurchase {
 
   amount         Float       // কেনা রিচার্জ টাকা (e.g. 5000 BDT)
   commission     Float       @default(0) // অর্জিত কমিশন (e.g. 135 BDT)
-  totalReceived  Float       // সিমে যোগ হওয়া মোট ব্যালেন্স (Amount + Commission)
+  totalReceived  Float       // সিমে যোগ হওয়া মোট ব্যালেন্স (Amount + Commission)
 
   note           String?
   createdAt      DateTime    @default(now())

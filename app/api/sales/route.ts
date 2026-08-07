@@ -2,21 +2,52 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
-// ১. সকল সেলস অর্ডার এবং সেগুলোর অর্জিত প্রফিট ফেচ করা (GET)
-export async function GET() {
+// ১. সকল সেলস অর্ডার এবং সেগুলোর অর্জিত প্রফিট সঠিকভাবে ফেচ করা (GET)
+export async function GET(request: Request) {
   try {
     const currentUser = await getCurrentUser();
     if (!currentUser) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    const { storeId } = currentUser;
+    const { searchParams } = new URL(request.url);
+    const range = searchParams.get("range") || "all";
+
+    let dateFilter = {};
+    if (range === "today") {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      dateFilter = { createdAt: { gte: today } };
+    }
+
     const sales = await prisma.saleOrder.findMany({
-      where: { storeId: currentUser.storeId },
+      where: { 
+        storeId,
+        ...dateFilter
+      },
       orderBy: { createdAt: "desc" },
-      include: {
-        customer: { select: { name: true, phone: true } },
+      select: {
+        id: true,
+        invoiceNo: true,
+        subTotal: true,
+        discount: true,
+        grandTotal: true,
+        profitAmount: true, // 👈 নিশ্চিতভাবে প্রফিটের ফিল্ড যুক্ত করা হলো
+        paidAmount: true,
+        dueAmount: true,
+        paymentMethod: true,
+        createdAt: true,
+        customer: { 
+          select: { name: true, phone: true } 
+        },
         items: {
-          include: {
+          select: {
+            id: true,
+            quantity: true,
+            unitPrice: true,
+            costPrice: true,
+            totalPrice: true,
             product: { select: { name: true, unit: true } },
           },
         },
@@ -30,7 +61,7 @@ export async function GET() {
   }
 }
 
-// ২. নতুন প্রোডাক্ট সেলস করার সাথে সাথে প্রফিট হিসেব করে সেভ করা (POST)
+// ২. নতুন সেলস তৈরি করা ও সঠিক প্রোডাক্ট প্রফিট সেভ করা (POST)
 export async function POST(request: Request) {
   try {
     const currentUser = await getCurrentUser();
@@ -55,11 +86,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ success: false, error: "Items are required" }, { status: 400 });
     }
 
-    // ১. ইউনিক ইনভয়েস নম্বর তৈরি
+    // ১. ইনভয়েস নম্বর ও সাধারণ অংক
     const invoiceNo = `INV-${Date.now().toString().slice(-6)}`;
-    const totalPaid = Number(paidAmount) || 0;
-    const totalGrand = Number(grandTotal) || 0;
+    const totalSub = Number(subTotal) || 0;
     const totalDiscount = Number(discount) || 0;
+    const totalGrand = Number(grandTotal) || (totalSub - totalDiscount);
+    const totalPaid = Number(paidAmount) || 0;
     const dueAmount = Math.max(0, totalGrand - totalPaid);
 
     const result = await prisma.$transaction(async (tx) => {
@@ -76,38 +108,41 @@ export async function POST(request: Request) {
           throw new Error(`Product not found: ${item.productId}`);
         }
 
-        const costPrice = product.costPrice || 0;
-        const itemTotalCost = costPrice * item.quantity;
+        const costPrice = Number(product.costPrice) || 0;
+        const itemQuantity = Number(item.quantity) || 0;
+        const itemUnitPrice = Number(item.unitPrice) || 0;
+
+        const itemTotalCost = costPrice * itemQuantity;
         totalCostOfGoods += itemTotalCost;
 
         saleItemsData.push({
           productId: item.productId,
-          quantity: item.quantity,
-          unitPrice: Number(item.unitPrice),
-          costPrice: costPrice, // কেনার সময়কার আসল দাম
-          totalPrice: Number(item.unitPrice) * item.quantity,
+          quantity: itemQuantity,
+          unitPrice: itemUnitPrice,
+          costPrice: costPrice, // বিক্রয়ের সময়কার আসল কেনাদাম
+          totalPrice: itemUnitPrice * itemQuantity,
         });
 
         // প্রোডাক্ট স্টক আপডেট
         await tx.product.update({
           where: { id: item.productId, storeId },
-          data: { stock: { decrement: item.quantity } },
+          data: { stock: { decrement: itemQuantity } },
         });
       }
 
       // 🎯 নিট প্রফিট হিসাব = (Grand Total) - (Total Product Cost)
       const calculatedProfit = totalGrand - totalCostOfGoods;
 
-      // ৩. SaleOrder ক্রিয়েট করা
+      // ৩. SaleOrder তৈরি
       const saleOrder = await tx.saleOrder.create({
         data: {
           storeId,
           customerId: customerId || null,
           invoiceNo,
-          subTotal: Number(subTotal),
+          subTotal: totalSub,
           discount: totalDiscount,
           grandTotal: totalGrand,
-          profitAmount: calculatedProfit, // 👈 প্রফিট সেভ হলো
+          profitAmount: calculatedProfit, // 👈 নির্ভুল প্রফিট সেভ
           paidAmount: totalPaid,
           dueAmount,
           paymentMethod: paymentMethod || "CASH",
@@ -118,7 +153,7 @@ export async function POST(request: Request) {
         },
       });
 
-      // ৪. কাস্টমার বকেয়া খাতা আপডেট (যদি বকেয়া থাকে)
+      // ৪. কাস্টমার বকেয়া খাতা আপডেট (যদি বকেয়া থাকে)
       if (dueAmount > 0 && customerId) {
         await tx.customer.update({
           where: { id: customerId, storeId },
