@@ -12,10 +12,9 @@ import {
   ChevronDown, 
   Sparkles,
   X,
-  User,
   Mail,
-  ShieldCheck,
-  LogOut
+  LogOut,
+  Calendar
 } from "lucide-react";
 import { useAuthStore } from "@/app/stores/useAuthStore";
 import Link from "next/link";
@@ -25,15 +24,18 @@ export function TopHeader() {
   const [mounted, setMounted] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showNotifications, setShowNotifications] = useState(false);
-  const [showUserMenu, setShowUserMenu] = useState(false); // 👈 Profile Menu State
+  const [showUserMenu, setShowUserMenu] = useState(false);
   const [currentTime, setCurrentTime] = useState<string>("");
+  const [currentDate, setCurrentDate] = useState<string>("");
 
   useEffect(() => {
     setMounted(true);
     
-    // Live Time Update
-    const timer = setInterval(() => {
+    // Live Time & Date Update
+    const updateDateTime = () => {
       const now = new Date();
+
+      // Time Format: 10:00:00 AM
       setCurrentTime(
         now.toLocaleTimeString("en-US", {
           hour: "2-digit",
@@ -42,7 +44,16 @@ export function TopHeader() {
           hour12: true,
         })
       );
-    }, 1000);
+
+      // Date Format: 8 August 2026
+      const day = now.getDate();
+      const month = now.toLocaleDateString("en-US", { month: "long" });
+      const year = now.getFullYear();
+      setCurrentDate(`${day} ${month} ${year}`);
+    };
+
+    updateDateTime();
+    const timer = setInterval(updateDateTime, 1000);
 
     return () => clearInterval(timer);
   }, []);
@@ -70,9 +81,9 @@ export function TopHeader() {
   };
 
   return (
-    <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-6 py-2.5 flex items-center justify-between sticky top-0 z-40 shadow-xs select-none">
+    <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 px-6 py-2 flex items-center justify-between sticky top-0 z-40 shadow-xs select-none">
       
-      {/* 1. LEFT SIDE: STORE BADGE & LIVE CLOCK */}
+      {/* 1. LEFT SIDE: STORE BADGE, LIVE CLOCK & DATE */}
       <div className="flex items-center gap-3">
         {/* Store Name Badge */}
         <div className="flex items-center gap-2 bg-gradient-to-r from-emerald-50 to-teal-50 border border-emerald-200/70 text-emerald-900 px-3.5 py-1.5 rounded-full text-xs font-bold shadow-2xs">
@@ -81,10 +92,16 @@ export function TopHeader() {
           <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse ml-1" />
         </div>
 
-        {/* Real-time Clock Badge */}
-        <div className="hidden md:flex items-center gap-1.5 bg-slate-100/80 border border-slate-200/80 text-slate-600 px-3 py-1.5 rounded-full text-xs font-bold">
-          <Clock className="w-3.5 h-3.5 text-slate-400" />
-          <span className="font-mono text-[11px]">{currentTime || "10:00:00 AM"}</span>
+        {/* Real-time Clock & Date Badge */}
+        <div className="hidden md:flex flex-col text-xs bg-slate-100/80 border border-slate-200/80 px-3 py-1 rounded-xl">
+          <div className="flex items-center gap-1.5 text-slate-700 font-bold">
+            <Clock className="w-3 h-3 text-emerald-600" />
+            <span className="font-mono text-[11px]">{currentTime || "10:00:00 AM"}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-slate-500 text-[10px] font-semibold mt-0.5">
+            <Calendar className="w-2.5 h-2.5 text-slate-400" />
+            <span>{currentDate || "8 August 2026"}</span>
+          </div>
         </div>
       </div>
 
@@ -173,7 +190,7 @@ export function TopHeader() {
               <ChevronDown className={`w-3.5 h-3.5 text-slate-500 transition-transform duration-200 ${showUserMenu ? "rotate-180" : ""}`} />
             </button>
 
-            {/* 🎯 USER INFORMATION CARD MODAL */}
+            {/* USER INFORMATION CARD MODAL */}
             {showUserMenu && (
               <div 
                 onMouseLeave={() => setShowUserMenu(false)}

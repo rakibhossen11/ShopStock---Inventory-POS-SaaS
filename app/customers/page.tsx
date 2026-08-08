@@ -11,8 +11,7 @@ import {
   CreditCard, 
   Trash2, 
   Loader2, 
-  X, 
-  DollarSign
+  X
 } from "lucide-react";
 
 interface Customer {
@@ -30,7 +29,7 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
 
-  // Create Modal
+  // Create Modal State
   const [createModal, setCreateModal] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [name, setName] = useState("");
@@ -39,7 +38,7 @@ export default function CustomersPage() {
   const [address, setAddress] = useState("");
   const [openingDue, setOpeningDue] = useState<number | "">(0);
 
-  // Collect Payment Modal
+  // Collect Payment Modal State
   const [payModal, setPayModal] = useState(false);
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null);
   const [payAmount, setPayAmount] = useState<number | "">("");
@@ -102,17 +101,18 @@ export default function CustomersPage() {
     }
   };
 
-  // ২. বাকী টাকা গ্রহণ সাবমিট
+  // ২. বাকী টাকা কালেকশন বা অ্যাডভান্স জমা নেওয়া
   const handleCollectDue = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedCustomer || !payAmount || Number(payAmount) <= 0) return;
 
     setIsPaying(true);
     try {
-      const res = await fetch("/api/customers/payment", {
+      const res = await fetch("/api/customers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          action: "COLLECT_DUE",
           customerId: selectedCustomer.id,
           amount: Number(payAmount),
           paymentMethod: payMethod,
@@ -139,7 +139,7 @@ export default function CustomersPage() {
     }
   };
 
-  // ৩. ডিলিট করা
+  // ৩. কাস্টমার ডিলিট করা
   const handleDelete = async (id: string, custName: string) => {
     if (!confirm(`Are you sure you want to delete ${custName}?`)) return;
 
@@ -165,9 +165,9 @@ export default function CustomersPage() {
   const totalDueReceivable = customers.reduce((sum, c) => sum + (c.dueBalance > 0 ? c.dueBalance : 0), 0);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6 pb-12">
+    <div className="max-w-6xl mx-auto space-y-6 pb-12 text-xs">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-6 rounded-2xl border border-slate-200 shadow-xs">
         <div>
           <h1 className="text-2xl font-bold text-slate-900 flex items-center gap-2.5">
             <Users className="w-7 h-7 text-emerald-600" />
@@ -180,7 +180,7 @@ export default function CustomersPage() {
 
         <button
           onClick={() => setCreateModal(true)}
-          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2.5 rounded-xl text-sm flex items-center gap-2 shadow-sm transition-all"
+          className="bg-emerald-600 hover:bg-emerald-700 text-white font-semibold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-xs transition-all cursor-pointer"
         >
           <UserPlus className="w-4 h-4" />
           <span>Add New Customer</span>
@@ -205,15 +205,15 @@ export default function CustomersPage() {
           placeholder="Search customer by name or phone..."
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="w-full bg-white border border-slate-200 pl-10 pr-4 py-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-full bg-white border border-slate-200 pl-10 pr-4 py-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-medium"
         />
         <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-3" />
       </div>
 
       {/* Customers Table */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xs overflow-hidden">
         {loading ? (
-          <div className="p-12 text-center text-slate-500 flex items-center justify-center gap-2 text-sm">
+          <div className="p-12 text-center text-slate-500 flex items-center justify-center gap-2 text-xs">
             <Loader2 className="w-5 h-5 animate-spin text-emerald-600" />
             Loading customers...
           </div>
@@ -229,7 +229,7 @@ export default function CustomersPage() {
                   <th className="p-4">Customer Name</th>
                   <th className="p-4">Phone / Email</th>
                   <th className="p-4">Address</th>
-                  <th className="p-4">Current Due</th>
+                  <th className="p-4">Current Balance</th>
                   <th className="p-4 text-right">Actions</th>
                 </tr>
               </thead>
@@ -262,33 +262,37 @@ export default function CustomersPage() {
                       )}
                     </td>
 
+                    {/* 🎯 Due & Advance Status Display */}
                     <td className="p-4 font-bold">
                       {c.dueBalance > 0 ? (
                         <span className="text-rose-600 bg-rose-50 px-2.5 py-1 rounded-lg border border-rose-100 inline-block">
                           Due: ৳ {c.dueBalance.toLocaleString()}
                         </span>
+                      ) : c.dueBalance < 0 ? (
+                        <span className="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-100 inline-block">
+                          Advance: ৳ {Math.abs(c.dueBalance).toLocaleString()}
+                        </span>
                       ) : (
-                        <span className="text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-lg inline-block">
+                        <span className="text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg inline-block">
                           Clear (৳ 0)
                         </span>
                       )}
                     </td>
 
                     <td className="p-4 text-right space-x-2">
-                      {c.dueBalance > 0 && (
-                        <button
-                          onClick={() => {
-                            setSelectedCustomer(c);
-                            setPayModal(true);
-                          }}
-                          className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors inline-flex items-center gap-1"
-                        >
-                          <CreditCard className="w-3.5 h-3.5" /> Collect Due
-                        </button>
-                      )}
+                      <button
+                        onClick={() => {
+                          setSelectedCustomer(c);
+                          setPayModal(true);
+                        }}
+                        className="bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold px-3 py-1.5 rounded-lg text-xs transition-colors inline-flex items-center gap-1 cursor-pointer"
+                      >
+                        <CreditCard className="w-3.5 h-3.5" /> 
+                        {c.dueBalance > 0 ? "Collect Due" : "Add Payment / Advance"}
+                      </button>
                       <button
                         onClick={() => handleDelete(c.id, c.name)}
-                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-4 h-4" />
                       </button>
@@ -303,14 +307,14 @@ export default function CustomersPage() {
 
       {/* MODAL 1: Add New Customer */}
       {createModal && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                 <UserPlus className="w-5 h-5 text-emerald-600" />
                 Add New Customer
               </h3>
-              <button onClick={() => setCreateModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setCreateModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -363,10 +367,10 @@ export default function CustomersPage() {
               </div>
 
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Previous Due Balance (BDT)</label>
+                <label className="font-semibold text-slate-700 block mb-1">Previous Balance (BDT)</label>
                 <input
                   type="number"
-                  placeholder="0"
+                  placeholder="0 (Positive for due, negative for advance)"
                   value={openingDue}
                   onChange={(e) => setOpeningDue(e.target.value === "" ? "" : Number(e.target.value))}
                   className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold text-rose-600"
@@ -377,14 +381,14 @@ export default function CustomersPage() {
                 <button
                   type="button"
                   onClick={() => setCreateModal(false)}
-                  className="w-1/2 border border-slate-200 py-2.5 rounded-xl font-semibold text-slate-600"
+                  className="w-1/2 border border-slate-200 py-2.5 rounded-xl font-semibold text-slate-600 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting}
-                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-all"
+                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-all cursor-pointer"
                 >
                   {isSubmitting ? "Saving..." : "Save Customer"}
                 </button>
@@ -394,16 +398,16 @@ export default function CustomersPage() {
         </div>
       )}
 
-      {/* MODAL 2: Collect Due Payment */}
+      {/* MODAL 2: Collect Due / Advance Payment */}
       {payModal && selectedCustomer && (
-        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl border border-slate-200 space-y-4">
+        <div className="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border border-slate-200 space-y-4">
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <h3 className="font-bold text-slate-900 text-base flex items-center gap-2">
                 <CreditCard className="w-5 h-5 text-emerald-600" />
-                Collect Customer Due
+                Receive Customer Payment
               </h3>
-              <button onClick={() => setPayModal(false)} className="text-slate-400 hover:text-slate-600">
+              <button onClick={() => setPayModal(false)} className="text-slate-400 hover:text-slate-600 cursor-pointer">
                 <X className="w-5 h-5" />
               </button>
             </div>
@@ -411,21 +415,24 @@ export default function CustomersPage() {
             <div className="bg-slate-50 p-3 rounded-xl space-y-1 text-xs">
               <p className="font-bold text-slate-800">{selectedCustomer.name}</p>
               <p className="text-slate-500">
-                Current Due Amount:{" "}
-                <span className="font-bold text-rose-600">
-                  ৳ {selectedCustomer.dueBalance.toLocaleString()}
+                Current Status:{" "}
+                <span className={`font-bold ${selectedCustomer.dueBalance > 0 ? "text-rose-600" : "text-emerald-600"}`}>
+                  {selectedCustomer.dueBalance > 0 
+                    ? `Due: ৳ ${selectedCustomer.dueBalance.toLocaleString()}` 
+                    : selectedCustomer.dueBalance < 0 
+                      ? `Advance: ৳ ${Math.abs(selectedCustomer.dueBalance).toLocaleString()}` 
+                      : "Clear (৳ 0)"}
                 </span>
               </p>
             </div>
 
             <form onSubmit={handleCollectDue} className="space-y-3 text-xs">
               <div>
-                <label className="font-semibold text-slate-700 block mb-1">Amount Collected (BDT) *</label>
+                <label className="font-semibold text-slate-700 block mb-1">Amount Received (BDT) *</label>
                 <input
                   type="number"
                   min="1"
-                  max={selectedCustomer.dueBalance}
-                  placeholder="Enter collected amount"
+                  placeholder="Enter payment amount"
                   value={payAmount}
                   onChange={(e) => setPayAmount(e.target.value === "" ? "" : Number(e.target.value))}
                   className="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-emerald-500 font-bold"
@@ -438,7 +445,7 @@ export default function CustomersPage() {
                 <select
                   value={payMethod}
                   onChange={(e) => setPayMethod(e.target.value)}
-                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  className="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500 font-semibold"
                 >
                   <option value="CASH">CASH</option>
                   <option value="BKASH">BKASH / NAGAD</option>
@@ -462,14 +469,14 @@ export default function CustomersPage() {
                 <button
                   type="button"
                   onClick={() => setPayModal(false)}
-                  className="w-1/2 border border-slate-200 py-2.5 rounded-xl font-semibold text-slate-600"
+                  className="w-1/2 border border-slate-200 py-2.5 rounded-xl font-semibold text-slate-600 cursor-pointer"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isPaying}
-                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-all"
+                  className="w-1/2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition-all cursor-pointer"
                 >
                   {isPaying ? "Processing..." : "Confirm Payment"}
                 </button>
