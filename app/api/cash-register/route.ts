@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import prisma from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 
-// ১. কারেন্ট এক্টিভ শিফট এবং রিয়েল-টাইম রেকর্ড ফেচ করা (GET)
+// ১. কারেন্ট এক্টিভ শিফট এবং আগের দিনের ক্লোজিং ব্যালেন্স ফেচ করা (GET)
 export async function GET() {
   try {
     const currentUser = await getCurrentUser();
@@ -10,7 +10,7 @@ export async function GET() {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
-    // এই মুহূর্তে রানিং বা ওপেন থাকা শিফট বের করা
+    // একটিভ শিফট বের করা
     const activeRegister = await prisma.cashRegister.findFirst({
       where: {
         storeId: currentUser.storeId,
@@ -19,7 +19,7 @@ export async function GET() {
       },
       include: {
         transactions: {
-          orderBy: { createdAt: "desc" }, // সাম্প্রতিক ট্রানজেকশনগুলো আগে দেখাবে
+          orderBy: { createdAt: "desc" },
         },
         user: {
           select: { name: true, staffCode: true, email: true },
@@ -27,7 +27,60 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({ success: true, data: activeRegister });
+    let shiftSummary = null;
+
+    if (activeRegister) {
+      const shiftStart = activeRegister.openedAt;
+
+      const sales = await prisma.saleOrder.aggregate({
+        where: { storeId: currentUser.storeId, createdAt: { gte: shiftStart } },
+        _sum: { grandTotal: true, paidAmount: true, dueAmount: true },
+      });
+
+      const purchases = await prisma.purchaseOrder.aggregate({
+        where: { storeId: currentUser.storeId, createdAt: { gte: shiftStart } },
+        _sum: { paidAmount: true },
+      });
+
+      const collections = await prisma.customerPayment.aggregate({
+        where: { storeId: currentUser.storeId, createdAt: { gte: shiftStart } },
+        _sum: { amount: true },
+      });
+
+      shiftSummary = {
+        totalSales: sales._sum.grandTotal || 0,
+        cashFromSales: sales._sum.paidAmount || 0,
+        dueGiven: sales._sum.dueAmount || 0,
+        totalPurchasesPaid: purchases._sum.paidAmount || 0,
+        customerCollections: collections._sum.amount || 0,
+      };
+
+      return NextResponse.json({ 
+        success: true, 
+        data: { ...activeRegister, shiftSummary } 
+      });
+    }
+
+    // কোনো একটিভ শিফট না থাকলে আগের শেষ ক্লোজিং শিফটের তথ্য ফেচ করা
+    const lastClosedShift = await prisma.cashRegister.findFirst({
+      where: {
+        storeId: currentUser.storeId,
+        status: "CLOSED",
+      },
+      orderBy: { closedAt: "desc" },
+      select: {
+        closingBalance: true,
+        closedAt: true,
+      },
+    });
+
+    return NextResponse.json({ 
+      success: true, 
+      data: null,
+      previousClosingBalance: lastClosedShift?.closingBalance || 0,
+      lastClosedAt: lastClosedShift?.closedAt || null
+    });
+
   } catch (error) {
     console.error("Fetch Register Error:", error);
     return NextResponse.json(
@@ -47,7 +100,6 @@ export async function POST(request: Request) {
 
     const { openingBalance, note } = await request.json();
 
-    // চেক করা অলরেডি কোনো ওপেন শিফট আছে কি না
     const existingOpenShift = await prisma.cashRegister.findFirst({
       where: {
         storeId: currentUser.storeId,
@@ -58,7 +110,7 @@ export async function POST(request: Request) {
 
     if (existingOpenShift) {
       return NextResponse.json(
-        { success: false, error: "You already have an active register shift open" },
+        { success: false, error: "You already have an active shift open" },
         { status: 400 }
       );
     }
@@ -73,9 +125,7 @@ export async function POST(request: Request) {
       },
       include: {
         transactions: true,
-        user: {
-          select: { name: true, staffCode: true },
-        },
+        user: { select: { name: true, staffCode: true } },
       },
     });
 
@@ -89,7 +139,7 @@ export async function POST(request: Request) {
   }
 }
 
-// ৩. শিফট ক্লোজ করা এবং গরমিল (Difference) হিসাব করা (PUT)
+// ৩. শিফট ক্লোজ করা (PUT)
 export async function PUT(request: Request) {
   try {
     const currentUser = await getCurrentUser();
@@ -100,10 +150,7 @@ export async function PUT(request: Request) {
     const { registerId, closingBalance, note } = await request.json();
 
     if (!registerId) {
-      return NextResponse.json(
-        { success: false, error: "Register ID is required" },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: "Register ID is required" }, { status: 400 });
     }
 
     const register = await prisma.cashRegister.findUnique({
@@ -112,14 +159,9 @@ export async function PUT(request: Request) {
     });
 
     if (!register || register.status === "CLOSED") {
-      return NextResponse.json(
-        { success: false, error: "Register shift not found or already closed" },
-        { status: 400 }
-      );
+      return NextResponse.json({ success: false, error: "Shift not found or already closed" }, { status: 400 });
     }
 
-    // সিস্টেমে এক্সপেক্টেড ব্যালেন্স হিসাব করা
-    // Expected = Opening Balance + Total Cash In - Total Cash Out
     const totalCashIn = register.transactions
       .filter((t) => t.type === "CASH_IN" || t.type === "PAYMENT")
       .reduce((sum, t) => sum + Number(t.amount || 0), 0);
@@ -130,7 +172,7 @@ export async function PUT(request: Request) {
 
     const expectedBalance = Number(register.openingBalance || 0) + totalCashIn - totalCashOut;
     const actualClosing = Number(closingBalance) || 0;
-    const difference = actualClosing - expectedBalance; // গরমিল (+ বেশি বা - কম)
+    const difference = actualClosing - expectedBalance;
 
     const closedRegister = await prisma.cashRegister.update({
       where: { id: registerId },
@@ -142,17 +184,12 @@ export async function PUT(request: Request) {
         closedAt: new Date(),
         note: note ? String(note).trim() : register.note,
       },
-      include: {
-        transactions: true,
-      },
+      include: { transactions: true },
     });
 
     return NextResponse.json({ success: true, data: closedRegister });
   } catch (error) {
     console.error("Close Register Error:", error);
-    return NextResponse.json(
-      { success: false, error: "Failed to close register" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: "Failed to close register" }, { status: 500 });
   }
 }

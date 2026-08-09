@@ -58,6 +58,13 @@ enum MfsTxType {
   COMMISSION_GAIN
 }
 
+enum CapitalType {
+  CAPITAL_IN    // মালিকের মূলধন বিনিয়োগ (+)
+  DRAWING_OUT   // মালিকের ব্যক্তিগত উত্তোলন (-)
+  LOAN_TAKEN    // বাইরে থেকে ঋণ গ্রহণ (+)
+  LOAN_REPAID   // ঋণ পরিশোধ (-)
+}
+
 // ------------------------------------------------------
 // STORE MODEL
 // ------------------------------------------------------
@@ -92,6 +99,9 @@ model Store {
   dailyClosings         DailyClosing[]
   mfsDailyStocks        MfsDailyStock[]
   
+  // 🎯 Capital & Investment Relation Added
+  capitalTransactions   CapitalTransaction[]
+
   // Recharge Module Relations
   rechargeSims          RechargeSim[]
   rechargePurchases     RechargePurchase[]
@@ -135,6 +145,7 @@ model CashRegister {
   note            String?
 
   transactions    CashTransaction[]
+  capitalTransactions CapitalTransaction[]
 }
 
 model CashTransaction {
@@ -146,6 +157,28 @@ model CashTransaction {
   amount     Float
   reason     String?
   createdAt  DateTime        @default(now())
+}
+
+// ------------------------------------------------------
+// INVESTMENT & OWNER CAPITAL MANAGEMENT (ADDED MODEL)
+// ------------------------------------------------------
+
+model CapitalTransaction {
+  id              String        @id @default(uuid())
+  storeId         String
+  store           Store         @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  registerId      String?
+  register        CashRegister? @relation(fields: [registerId], references: [id], onDelete: SetNull)
+
+  type            CapitalType
+  amount          Float
+  sourceOrPerson  String?       // e.g. "Store Owner", "Bank Loan", "Friend"
+  paymentMethod   String        @default("CASH")
+  note            String?
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
 }
 
 // ------------------------------------------------------
@@ -348,7 +381,7 @@ model SaleOrder {
   subTotal      Float
   discount      Float      @default(0)
   grandTotal    Float
-  profitAmount  Float      @default(0) // 👈 FIXED: Unknown argument problem solved!
+  profitAmount  Float      @default(0)
 
   paidAmount    Float      @default(0)
   dueAmount     Float      @default(0)

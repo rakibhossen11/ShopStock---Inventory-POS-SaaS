@@ -8,6 +8,14 @@ export interface Transaction {
   createdAt: string;
 }
 
+export interface ShiftSummary {
+  totalSales: number;
+  cashFromSales: number;
+  dueGiven: number;
+  totalPurchasesPaid: number;
+  customerCollections: number;
+}
+
 export interface CashRegister {
   id: string;
   openingBalance: number;
@@ -19,10 +27,13 @@ export interface CashRegister {
   closedAt?: string;
   note?: string;
   transactions: Transaction[];
+  shiftSummary?: ShiftSummary;
 }
 
 interface RegisterState {
   currentRegister: CashRegister | null;
+  previousClosingBalance: number | null;
+  lastClosedAt: string | null;
   loading: boolean;
   fetchCurrentRegister: () => Promise<void>;
   openRegister: (openingBalance: number, note?: string) => Promise<boolean>;
@@ -32,6 +43,8 @@ interface RegisterState {
 
 export const useCashRegisterStore = create<RegisterState>((set, get) => ({
   currentRegister: null,
+  previousClosingBalance: null,
+  lastClosedAt: null,
   loading: false,
 
   fetchCurrentRegister: async () => {
@@ -40,7 +53,11 @@ export const useCashRegisterStore = create<RegisterState>((set, get) => ({
       const res = await fetch("/api/cash-register");
       const data = await res.json();
       if (data.success) {
-        set({ currentRegister: data.data });
+        set({
+          currentRegister: data.data,
+          previousClosingBalance: data.previousClosingBalance ?? 0,
+          lastClosedAt: data.lastClosedAt ?? null,
+        });
       }
     } catch (error) {
       console.error("Error fetching register:", error);
@@ -58,7 +75,7 @@ export const useCashRegisterStore = create<RegisterState>((set, get) => ({
       });
       const data = await res.json();
       if (data.success) {
-        set({ currentRegister: data.data });
+        await get().fetchCurrentRegister();
         return true;
       }
       alert(data.error || "Failed to open register");
@@ -85,7 +102,7 @@ export const useCashRegisterStore = create<RegisterState>((set, get) => ({
       });
       const data = await res.json();
       if (data.success) {
-        set({ currentRegister: null });
+        await get().fetchCurrentRegister();
         return true;
       }
       alert(data.error || "Failed to close register");
@@ -113,7 +130,7 @@ export const useCashRegisterStore = create<RegisterState>((set, get) => ({
       });
       const data = await res.json();
       if (data.success) {
-        await fetchCurrentRegister(); // রিয়েল-টাইমে ব্যালেন্স আপডেট
+        await fetchCurrentRegister();
         return true;
       }
       return false;
