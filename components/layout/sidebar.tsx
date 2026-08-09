@@ -20,7 +20,8 @@ import {
   ChevronDown,
   Smartphone,
   Wallet,
-  LogOut
+  LogOut,
+  TrendingUp
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { NavItem } from "@/types/nav";
@@ -76,6 +77,7 @@ const navItems: NavItem[] = [
     icon: Wallet,
     // roles: ["STORE_OWNER", "MANAGER", "CASHIER"],
   },
+  { title: "Investments", href: "/investments", icon: TrendingUp },
   { title: "Reports", href: "/reports", icon: BarChart3 },
   { title: "Support", href: "/support", icon: Headphones },
   {

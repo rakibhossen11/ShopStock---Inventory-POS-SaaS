@@ -9,118 +9,126 @@ export async function GET(request: Request) {
       return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
     }
 
+    const { storeId } = currentUser;
     const { searchParams } = new URL(request.url);
-    const filter = searchParams.get("filter") || "this_month";
+    const range = searchParams.get("range") || "DAILY"; // "DAILY" | "WEEKLY" | "MONTHLY" | "CUSTOM"
+    const startDateParam = searchParams.get("startDate");
+    const endDateParam = searchParams.get("endDate");
 
-    // তারিখ রেঞ্জ ফিল্টার সেট করা
-    const now = new Date();
-    let startDate: Date | undefined;
+    let startDate = new Date();
+    let endDate = new Date();
 
-    if (filter === "today") {
-      startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    } else if (filter === "last_7_days") {
-      startDate = new Date();
-      startDate.setDate(now.getDate() - 7);
-    } else if (filter === "this_month") {
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    // ডেট ফিল্টার লজিক
+    if (range === "DAILY") {
+      startDate.setHours(0, 0, 0, 0);
+      endDate.setHours(23, 59, 59, 999);
+    } else if (range === "WEEKLY") {
+      startDate.setDate(startDate.getDate() - 7);
+      startDate.setHours(0, 0, 0, 0);
+    } else if (range === "MONTHLY") {
+      startDate.setDate(1); // মাসের ১ম দিন
+      startDate.setHours(0, 0, 0, 0);
+    } else if (range === "CUSTOM" && startDateParam && endDateParam) {
+      startDate = new Date(startDateParam);
+      endDate = new Date(endDateParam);
+      endDate.setHours(23, 59, 59, 999);
     }
 
-    const dateQuery = startDate ? { gte: startDate } : undefined;
+    const dateFilter = {
+      storeId,
+      createdAt: {
+        gte: startDate,
+        lte: endDate,
+      },
+    };
 
-    // ১. Sales Data ফেচ করা
-    const salesOrders = await prisma.saleOrder.findMany({
-      where: {
-        storeId: currentUser.storeId,
-        createdAt: dateQuery,
+    // ১. বিক্রয় ও মোট প্রফিট হিসাব (SaleOrders)
+    const salesSummary = await prisma.saleOrder.aggregate({
+      where: { ...dateFilter, status: "COMPLETED" },
+      _sum: {
+        grandTotal: true,
+        profitAmount: true,
+        paidAmount: true,
+        dueAmount: true,
       },
-      include: {
-        items: {
-          include: {
-            product: { select: { costPrice: true, name: true } },
-          },
-        },
-      },
+      _count: { id: true },
     });
 
-    // ২. Expenses Data ফেচ করা
-    const expenses = await prisma.expense.findMany({
-      where: {
-        storeId: currentUser.storeId,
-        createdAt: dateQuery,
-      },
+    // ২. মোট খরচ (Expenses)
+    const expenseSummary = await prisma.expense.aggregate({
+      where: dateFilter,
+      _sum: { amount: true },
     });
 
-    // ৩. Overall Product & Stock Data
-    const products = await prisma.product.findMany({
-      where: { storeId: currentUser.storeId },
-      select: {
-        id: true,
-        name: true,
-        costPrice: true,
-        sellingPrice: true,
-        stock: true,
-      },
+    // ৩. ক্যাটাগরি অনুযায়ী খরচের ব্রেকডাউন (Highest Expenses)
+    const expensesByCategory = await prisma.expense.groupBy({
+      by: ["categoryId"],
+      where: dateFilter,
+      _sum: { amount: true },
+      orderBy: { _sum: { amount: "desc" } },
+      take: 5,
     });
 
-    // ৪. Customer & Supplier Dues Data
-    const [customers, suppliers] = await Promise.all([
-      prisma.customer.aggregate({
-        where: { storeId: currentUser.storeId },
-        _sum: { dueBalance: true },
-      }),
-      prisma.supplier.aggregate({
-        where: { storeId: currentUser.storeId },
-        _sum: { currentBalance: true },
-      }),
-    ]);
-
-    // 🧮 আর্থিক হিসাবসমূহ (Calculations)
-    let totalSalesRevenue = 0;
-    let totalPaidCollected = 0;
-    let totalSalesDue = 0;
-    let totalCOGS = 0; // Cost of Goods Sold
-
-    salesOrders.forEach((order) => {
-      totalSalesRevenue += order.grandTotal;
-      totalPaidCollected += order.paidAmount;
-      totalSalesDue += order.dueAmount;
-
-      order.items.forEach((item) => {
-        // মালটার ক্রয়মূল্য x বিক্রির পরিমাণ
-        const costPrice = item.product?.costPrice || 0;
-        totalCOGS += costPrice * item.quantity;
-      });
+    // ক্যাটাগরির নাম যুক্ত করা
+    const categoryIds = expensesByCategory.map((e) => e.categoryId).filter(Boolean) as string[];
+    const categories = await prisma.expenseCategory.findMany({
+      where: { id: { in: categoryIds } },
     });
 
-    const totalExpensesAmount = expenses.reduce((sum, e) => sum + e.amount, 0);
-    const grossProfit = totalSalesRevenue - totalCOGS;
-    const netProfit = grossProfit - totalExpensesAmount;
+    const formattedCategoryExpenses = expensesByCategory.map((exp) => {
+      const cat = categories.find((c) => c.id === exp.categoryId);
+      return {
+        categoryName: cat ? cat.name : "Uncategorized",
+        amount: exp._sum.amount || 0,
+      };
+    });
 
-    // ইনভেন্টরি ভ্যালুয়েশন
-    const totalInventoryCost = products.reduce((sum, p) => sum + p.stock * p.costPrice, 0);
-    const totalInventorySalesValue = products.reduce((sum, p) => sum + p.stock * p.sellingPrice, 0);
+    // ৪. MFS ও রিচার্জ প্রফিট
+    const mfsOrders = await prisma.mfsOrder.aggregate({
+      where: dateFilter,
+      _sum: { commissionAmount: true },
+    });
+
+    const rechargePurchases = await prisma.rechargePurchase.aggregate({
+      where: dateFilter,
+      _sum: { commission: true },
+    });
+
+    // চূড়ান্ত গ্র্যান্ড ফাইনান্সিয়াল হিসাব
+    const totalSales = salesSummary._sum.grandTotal || 0;
+    const totalPosProfit = salesSummary._sum.profitAmount || 0;
+    const totalMfsProfit = mfsOrders._sum.commissionAmount || 0;
+    const totalRechargeProfit = rechargePurchases._sum.commission || 0;
+    
+    const grossProfit = totalPosProfit + totalMfsProfit + totalRechargeProfit;
+    const totalExpenses = expenseSummary._sum.amount || 0;
+    const netProfitOrLoss = grossProfit - totalExpenses; // প্রফিট না লস
 
     return NextResponse.json({
       success: true,
       data: {
-        metrics: {
-          totalSalesRevenue,
-          totalPaidCollected,
-          totalSalesDue,
-          totalCOGS,
+        summary: {
+          totalSales,
+          totalSalesCount: salesSummary._count.id || 0,
+          cashCollected: salesSummary._sum.paidAmount || 0,
+          totalDueGiven: salesSummary._sum.dueAmount || 0,
           grossProfit,
-          totalExpensesAmount,
-          netProfit,
-          totalInventoryCost,
-          totalInventorySalesValue,
-          customerDuesReceivable: customers._sum.dueBalance || 0,
-          supplierPayable: suppliers._sum.currentBalance || 0,
+          posProfit: totalPosProfit,
+          mfsProfit: totalMfsProfit,
+          rechargeProfit: totalRechargeProfit,
+          totalExpenses,
+          netProfitOrLoss,
+          isProfit: netProfitOrLoss >= 0,
         },
-        ordersCount: salesOrders.length,
+        categoryExpenses: formattedCategoryExpenses,
+        dateRange: {
+          start: startDate.toISOString(),
+          end: endDate.toISOString(),
+        },
       },
     });
-  } catch (error) {
+  } catch (error: any) {
     console.error("Fetch Reports Error:", error);
-    return NextResponse.json({ success: false, error: "Failed to generate report" }, { status: 500 });
+    return NextResponse.json({ success: false, error: error.message || "Failed to generate report" }, { status: 500 });
   }
 }
